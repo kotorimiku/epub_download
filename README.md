@@ -1,6 +1,5 @@
 # 构建
 
-
 #### 前提
 
 - [Rust](https://www.rust-lang.org/tools/install)
@@ -12,13 +11,13 @@
 #### 1. 克隆本仓库
 
 ```
-git clone https://github.com/lanyeeee/bilibili-manga-watermark-remover.git
+git clone https://github.com/kotorimiku/epub_download
 ```
 
 #### 2.安装依赖
 
 ```
-cd bilibili-manga-watermark-remover
+cd epub_download
 pnpm install
 ```
 
@@ -27,4 +26,3 @@ pnpm install
 ```
 pnpm tauri build
 ```
-
