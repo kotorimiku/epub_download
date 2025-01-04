@@ -26,6 +26,7 @@ fn get_headers(referer: &str, cookie: &str) -> HeaderMap {
     headers.insert(ACCEPT, HeaderValue::from_static(r"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"));
     headers.insert(COOKIE, HeaderValue::from_str(cookie).unwrap());
     headers.insert("Referer", HeaderValue::from_str(&(referer.to_string() + "/novel/4353/250879.html")).unwrap());
+    headers.insert("accept-encoding", HeaderValue::from_static("gzip, deflate, br, zstd"));
     headers.insert("priority", HeaderValue::from_static("u=0, i"));
     headers.insert("sec-ch-ua", HeaderValue::from_static("\"Microsoft Edge\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\""));
     headers.insert("sec-ch-ua-mobile", HeaderValue::from_static("?1"));
@@ -67,7 +68,7 @@ fn get_html(url: &str, client: &Client, message: &Message, sleep_time: u64) -> R
                 message.send(&text);
                 return Err("下载失败，请稍后再试".to_string());
             }
-            if text.contains("通告～客戶端停用中") || text.contains("內容加载失败") || text.contains("手机版页面由于相容性问题暂不支持电脑端阅读") {
+            if text.contains("通告～客戶端停用中")|| text.contains("通告～客户端停用中") || text.contains("內容加载失败") || text.contains("手机版页面由于相容性问题暂不支持电脑端阅读") {
                 println!("{}", &text);
                 message.send("无法下载完整内容，正在重试....");
                 std::thread::sleep(std::time::Duration::from_secs(3));
@@ -415,7 +416,7 @@ impl Downloader {
             ext_list.push(String::from(".") + &self.get_ext(self.book_info.cover.clone().unwrap()));
         } else {
             // 插图页提取
-            if volume.chapter_list[0] == "插图".to_string() {
+            if volume.chapter_list[0] == "插图" {
                 volume.chapter_list[0] = "彩页".to_string();
                 'outer: for chapter in &mut text {
                     for i in 0..chapter.len() {
@@ -427,6 +428,16 @@ impl Downloader {
                     }
                 }
             };
+        }
+
+        if volume.chapter_list[0] == "彩页" {
+            let color_page = text.remove(0);
+            let (texts, images): (Vec<_>, Vec<_>) = color_page.into_iter().partition(|content| matches!(content, Content::Text(_)));
+            text.insert(0, images); 
+            if texts.len() > 0 {
+                text.insert(0, texts);
+                volume.chapter_list.insert(0, "信息".to_string());
+            }
         }
 
         self.to_html(&mut text, &mut img_url_list, &mut text_html, &mut ext_list);
@@ -666,7 +677,7 @@ impl Downloader {
             return Err("Chapter text is empty".to_string());
         }
 
-        if html.contains(r#""read""#) {
+        if html.contains(r#"read|sheet|family"#) {
             for content in &mut chapter_text.iter_mut().rev() {
                 if let Content::Text(text) = content {
                     let new_text = decode_text(&text, &get_secret_map());
@@ -685,4 +696,3 @@ impl Downloader {
         }
     }
 }
-
