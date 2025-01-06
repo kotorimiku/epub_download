@@ -83,6 +83,11 @@ onMounted(() => {
             addNumber.value = res.add_number
             outputPath.value = res.output_path
         }
+        if (cookie.value === "") {
+            toast.error('您还没配置cookie，请先配置 Cookie', {
+                timeout: 3000,
+            });
+        }
     }).catch(() => {
         console.log("获取配置失败")
         toast.error('获取配置失败', {

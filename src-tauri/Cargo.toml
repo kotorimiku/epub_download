@@ -1,5 +1,5 @@
 [package]
-name = "bilinovel_downloader_tauri"
+name = "epub_download"
 version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
@@ -11,7 +11,7 @@ edition = "2021"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "bilinovel_downloader_tauri_lib"
+name = "epub_download_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -25,9 +25,10 @@ serde_json = "1"
 reqwest = {version = "0.12.9", features = ["blocking", "gzip", "deflate", "brotli", "zstd"] }
 scraper = "0.22.0"
 zip = "2.2.1"
-character_converter = "2.1.5"
 tokio = "1.42.0"
 regex = "1.11.1"
+chrono = "0.4.39"
+fast2s = "0.3.1"
 
 [profile.release]
 strip = true

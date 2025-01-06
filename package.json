@@ -1,5 +1,5 @@
 {
-  "name": "bilinovel_downloader_tauri",
+  "name": "epub_download",
   "private": true,
   "version": "0.1.0",
   "type": "module",

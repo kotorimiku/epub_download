@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use chrono::Utc;
 
 #[derive(Default, Debug)]
 pub struct MetaData {
@@ -10,6 +11,7 @@ pub struct MetaData {
     pub subject: Vec<String>,
     pub language: Option<String>,
     pub index: Option<usize>,
+    pub identifier: Option<String>,
 }
 
 pub struct EpubBuilder {
@@ -39,6 +41,7 @@ impl EpubBuilder {
 
     pub fn build_epub(&self) -> HashMap<String, Vec<u8>> {
         let mut epub = HashMap::new();
+        add_file(&mut epub, self.build_sgc_nav_css());
         epub.insert(
             String::from("mimetype"),
             "application/epub+zip".as_bytes().to_vec(),
@@ -67,6 +70,10 @@ impl EpubBuilder {
                     .to_vec(),
             );
         }
+        epub.insert(
+            String::from("OEBPS/Text/nav.xhtml"),
+            self.build_nav_xhtml().as_bytes().to_vec(),
+        );
         for i in 0..self.ext_list.len() {
             let ext = self.ext_list[i].split(".").last().unwrap();
             epub.insert(
@@ -108,8 +115,8 @@ impl EpubBuilder {
         <navLabel>
             <text>{}</text>
         </navLabel>
-    <content src="{}" />
-</navPoint>"#,
+        <content src="{}" />
+    </navPoint>"#,
                 i + 1,
                 i + 1,
                 self.chapter_list[i],
@@ -126,8 +133,7 @@ impl EpubBuilder {
         let guide = self.get_guide_xml();
         format!(
             r#"<?xml version="1.0" encoding="utf-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/"
-    unique-identifier="bookid" version="2.0">
+<package version="3.0" unique-identifier="BookId" xmlns="http://www.idpf.org/2007/opf">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
         {}
     </metadata>
@@ -154,9 +160,10 @@ impl EpubBuilder {
     fn get_spine_xml(&self) -> String {
         let mut spine = Vec::new();
         spine.push(format!("<itemref idref=\"cover.xhtml\"/>"));
+        spine.push(format!("<itemref idref=\"nav.xhtml\"/>"));
         for i in 0..self.chapter_list.len() {
             spine.push(format!(
-                "<itemref idref=\"{}.xhtml\"/>",
+                "<itemref idref=\"x{}.xhtml\"/>",
                 self.num_fill(i + 1)
             ));
         }
@@ -172,20 +179,22 @@ impl EpubBuilder {
 
         // text
         for i in 0..self.chapter_list.len() {
-            manifest.push(format!("<item id=\"{}.xhtml\" href=\"Text/{}.xhtml\" media-type=\"application/xhtml+xml\"/>", self.num_fill(i + 1), self.num_fill(i + 1)));
+            manifest.push(format!("<item id=\"x{}.xhtml\" href=\"Text/{}.xhtml\" media-type=\"application/xhtml+xml\"/>", self.num_fill(i + 1), self.num_fill(i + 1)));
         }
 
         // image
         for i in 0..self.img_data_list.len() {
             let ext = self.ext_list[i].split('.').last().unwrap();
             manifest.push(format!(
-                "<item id=\"{}.{}\" href=\"Images/{}.{}\" media-type=\"image/jpeg\"/>",
+                "<item id=\"x{}.{}\" href=\"Images/{}.{}\" media-type=\"image/jpeg\"/>",
                 self.num_fill(i),
                 ext,
                 self.num_fill(i),
                 ext
             ));
         }
+        manifest.push(r#"<item id="nav.xhtml" href="Text/nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>"#.to_string());
+        manifest.push(r#"<item id="sgc-nav.css" href="Styles/sgc-nav.css" media-type="text/css"/>"#.to_string());
         manifest.join("\n\t\t")
     }
 
@@ -204,6 +213,9 @@ impl EpubBuilder {
         if let Some(language) = &self.metadata.language {
             metadata.push(format!("<dc:language>{}</dc:language>", language));
         }
+        if let Some(identifier) = &self.metadata.identifier {
+            metadata.push(format!("<dc:identifier id=\"BookId\">{}</dc:identifier>", identifier));
+        }
         metadata.push(
             self.metadata
                 .subject
@@ -212,7 +224,9 @@ impl EpubBuilder {
                 .collect::<Vec<String>>()
                 .join("\n\t\t"),
         );
-        metadata.push(format!("<meta name=\"cover\" content=\"000.jpg\"/>"));
+        metadata.push(format!("<meta property=\"dcterms:modified\">{}</meta>", get_time()));
+
+        metadata.push(format!("<meta name=\"cover\" content=\"x000.{}\"/>", self.ext_list[0].trim_start_matches('.')));
         if let Some(series) = &self.metadata.series {
             metadata.push(format!(
                 "<meta name=\"calibre:series\" content=\"{}\"/>",
@@ -241,9 +255,10 @@ impl EpubBuilder {
 
     fn build_xhtml(&self, title: &str, body: &str) -> String {
         format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+            r#"<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
     <head>
         <title>{}</title>
         <style type="text/css">p{{text-indent:2em;}}</style>
@@ -264,8 +279,9 @@ impl EpubBuilder {
     fn build_cover_xhtml(&self) -> String {
         format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
 <head>
   <title>Cover</title>
 </head>
@@ -278,4 +294,91 @@ impl EpubBuilder {
             self.ext_list[0]
         )
     }
+
+    fn build_nav_xhtml(&self) -> String {
+        let mut nav_map = Vec::new();
+
+        for i in 0..self.chapter_list.len() {
+            nav_map.push(format!("<li><a href=\"{}.xhtml\">{}</a></li>", self.num_fill(i + 1), self.chapter_list[i]));
+        }
+
+        format!(r#"<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en" xml:lang="en">
+<head>
+  <title>ePub NAV</title>
+  <meta charset="utf-8"/>
+  <link href="../Styles/sgc-nav.css" rel="stylesheet" type="text/css"/>
+</head>
+<body epub:type="frontmatter">
+  <nav epub:type="toc" id="toc" role="doc-toc">
+    <h1>目录</h1>
+    <ol>
+        {}
+    </ol>
+  </nav>
+</body>
+</html>"#, nav_map.join("\n\t\t"))
+    }
+
+    fn build_sgc_nav_css(&self) -> (String, Vec<u8>) {
+        let file_path = String::from("OEBPS/Styles/sgc-nav.css");
+        (file_path, r#"nav#toc {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 20px;
+  background-color: #f8f8f8; /* 浅灰色背景 */
+  border-radius: 10px;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); /* 柔和的阴影 */
+}
+
+nav#toc h1 {
+  font-size: 24px;
+  color: #333;
+  text-align: center;
+  margin-bottom: 20px;
+  font-weight: bold; /* 加粗 */
+}
+
+nav#toc ol {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+nav#toc ol li {
+  margin-bottom: 10px;
+}
+
+nav#toc ol li a {
+  text-decoration: none;
+  font-size: 18px;
+  color: #555;
+  padding: 6px;
+  display: block;
+  transition: background-color 0.3s, color 0.3s;
+  border-radius: 5px;
+}
+
+nav#toc ol li a:hover {
+  background-color: #d9d9d9;
+  color: #000;
+}
+"#.as_bytes().to_vec())
+    }
+}
+
+
+fn add_file(epub: &mut HashMap<String, Vec<u8>>, file: (String, Vec<u8>)) {
+    epub.insert(file.0, file.1);
+}
+
+fn get_time() -> String {
+    // 获取当前 UTC 时间
+    let now = Utc::now();
+
+    // 格式化为 ISO 8601 格式 (YYYY-MM-DDThh:mm:ssZ)
+    let iso8601_time = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    iso8601_time
+
 }

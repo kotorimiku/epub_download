@@ -74,11 +74,12 @@ fn get_html(url: &str, client: &Client, message: &Message, sleep_time: u64) -> R
                 std::thread::sleep(std::time::Duration::from_secs(3));
                 return get_html(url, client, message, sleep_time);
             }
-            if text.contains("error code") {
-                message.send("请求失败，正在重试....");
-                std::thread::sleep(std::time::Duration::from_secs(3));
-                return get_html(url, client, message, sleep_time);
-            }
+            // novel/2492/139388_6.html包含error code
+            // if text.contains("error code") {
+            //     message.send("请求失败，正在重试....");
+            //     std::thread::sleep(std::time::Duration::from_secs(3));
+            //     return get_html(url, client, message, sleep_time);
+            // }
             return Ok(text);
         }
     }
@@ -399,6 +400,7 @@ impl Downloader {
         let mut ext_list = Vec::new();
 
         let mut next_url = self.get_start_next_url(volume, volume_no)?;
+        let first_url = next_url.clone();
 
         for i in 0..volume.chapter_list.len() {
             self.message.send(&format!(
@@ -469,6 +471,7 @@ impl Downloader {
             subject: self.book_info.tags.clone(),
             language: Some("zh-CN".to_string()),
             index: Some(volume_no),
+            identifier: Some(first_url)
         };
         let epub_builder = EpubBuilder::new(
             metadata,
@@ -500,7 +503,7 @@ impl Downloader {
             // 数据太小，进行验证
             if length < 5000 {
                 if code == 404 {
-                    self.message.send("\n  插图下载失败，404 Not Found");
+                    self.message.send(&format!("\n  插图下载失败，404 Not Found {}", img_url));
                     return Vec::new();
                 }
                 if String::from_utf8(data.clone().to_vec()).is_ok() {
