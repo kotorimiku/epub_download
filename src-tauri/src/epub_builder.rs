@@ -41,7 +41,7 @@ impl EpubBuilder {
 
     pub fn build_epub(&self) -> HashMap<String, Vec<u8>> {
         let mut epub = HashMap::new();
-        add_file(&mut epub, self.build_sgc_nav_css());
+        // mimetype需要是第一个文件
         epub.insert(
             String::from("mimetype"),
             "application/epub+zip".as_bytes().to_vec(),
@@ -81,6 +81,7 @@ impl EpubBuilder {
                 self.img_data_list[i].clone(),
             );
         }
+        add_file(&mut epub, self.build_sgc_nav_css());
         epub
     }
 

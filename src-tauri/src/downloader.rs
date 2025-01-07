@@ -1,20 +1,18 @@
 use crate::epub_builder::{EpubBuilder, MetaData};
 use crate::model::{BookInfo, Message, VolumeInfo};
 use crate::secret::{decode_text, get_secret_map};
-use crate::utils::{remove_invalid_chars, t2s};
+use crate::utils::{remove_invalid_chars, t2s, escape_epub_text};
+use regex::Regex;
 use std::collections::HashMap;
 use std::fs::{create_dir_all, File};
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::path::{self, absolute};
 use std::thread::sleep;
-
-use regex::Regex;
 // use reqwest::cookie::Jar;
+use crate::utils;
 use reqwest::blocking::Client;
-use reqwest::header::{
-    HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, COOKIE, USER_AGENT,
-};
+use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, COOKIE, USER_AGENT};
 use scraper::{Html, Selector};
 use zip::write::SimpleFileOptions;
 use zip::CompressionMethod;
@@ -22,21 +20,43 @@ use zip::CompressionMethod;
 fn get_headers(referer: &str, cookie: &str) -> HeaderMap {
     let mut headers = HeaderMap::new();
     headers.insert(USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Linux; Android 11; M2102J20SG) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Mobile Safari/537.36 EdgA/97.0.1072.78"));
-    headers.insert(ACCEPT_LANGUAGE, HeaderValue::from_static("en,zh-HK;q=0.9,zh-TW;q=0.8,zh-CN;q=0.7,zh;q=0.6,en-GB;q=0.5,en-US;q=0.4"));
+    headers.insert(
+        ACCEPT_LANGUAGE,
+        HeaderValue::from_static(
+            "en,zh-HK;q=0.9,zh-TW;q=0.8,zh-CN;q=0.7,zh;q=0.6,en-GB;q=0.5,en-US;q=0.4",
+        ),
+    );
     headers.insert(ACCEPT, HeaderValue::from_static(r"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"));
     headers.insert(COOKIE, HeaderValue::from_str(cookie).unwrap());
-    headers.insert("Referer", HeaderValue::from_str(&(referer.to_string() + "/novel/4353/250879.html")).unwrap());
-    headers.insert("accept-encoding", HeaderValue::from_static("gzip, deflate, br, zstd"));
+    headers.insert(
+        "Referer",
+        HeaderValue::from_str(&(referer.to_string() + "/novel/4353/250879.html")).unwrap(),
+    );
+    headers.insert(
+        "accept-encoding",
+        HeaderValue::from_static("gzip, deflate, br, zstd"),
+    );
     headers.insert("priority", HeaderValue::from_static("u=0, i"));
-    headers.insert("sec-ch-ua", HeaderValue::from_static("\"Microsoft Edge\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\""));
+    headers.insert(
+        "sec-ch-ua",
+        HeaderValue::from_static(
+            "\"Microsoft Edge\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+        ),
+    );
     headers.insert("sec-ch-ua-mobile", HeaderValue::from_static("?1"));
-    headers.insert("sec-ch-ua-platform", HeaderValue::from_static("\"Android\""));
+    headers.insert(
+        "sec-ch-ua-platform",
+        HeaderValue::from_static("\"Android\""),
+    );
     headers.insert("sec-fetch-dest", HeaderValue::from_static("document"));
     headers.insert("upgrade-insecure-requests", HeaderValue::from_static("1"));
     headers.insert("sec-fetch-user", HeaderValue::from_static("?1"));
     headers.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
     headers.insert("sec-fetch-mode", HeaderValue::from_static("navigate"));
-    headers.insert("Referrer-Policy", HeaderValue::from_static("strict-origin-when-cross-origin"));
+    headers.insert(
+        "Referrer-Policy",
+        HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
     headers
 }
 
@@ -47,8 +67,12 @@ pub fn get_client(referer: &str, cookie: &str) -> Client {
     Client::builder().default_headers(headers).build().unwrap()
 }
 
-
-fn get_html(url: &str, client: &Client, message: &Message, sleep_time: u64) -> Result<String, String> {
+fn get_html(
+    url: &str,
+    client: &Client,
+    message: &Message,
+    sleep_time: u64,
+) -> Result<String, String> {
     println!("{url}");
 
     std::thread::sleep(std::time::Duration::from_secs(sleep_time));
@@ -68,7 +92,11 @@ fn get_html(url: &str, client: &Client, message: &Message, sleep_time: u64) -> R
                 message.send(&text);
                 return Err("下载失败，请稍后再试".to_string());
             }
-            if text.contains("通告～客戶端停用中")|| text.contains("通告～客户端停用中") || text.contains("內容加载失败") || text.contains("手机版页面由于相容性问题暂不支持电脑端阅读") {
+            if text.contains("通告～客戶端停用中")
+                || text.contains("通告～客户端停用中")
+                || text.contains("內容加载失败")
+                || text.contains("手机版页面由于相容性问题暂不支持电脑端阅读")
+            {
                 println!("{}", &text);
                 message.send("无法下载完整内容，正在重试....");
                 std::thread::sleep(std::time::Duration::from_secs(3));
@@ -106,7 +134,7 @@ pub fn get_meta_data(html: &str) -> BookInfo {
     for element in document.select(&h1_selector) {
         if let Some(property) = element.value().attr("class") {
             if property == "book-title" {
-                title = Some(element.text().collect());
+                title = Some(escape_epub_text(element.text().collect::<String>().as_str()));
                 break;
             }
         }
@@ -114,7 +142,7 @@ pub fn get_meta_data(html: &str) -> BookInfo {
     for element in document.select(&span_selector) {
         if let Some(property) = element.value().attr("class") {
             if property == "authorname" {
-                author = Some(element.text().collect());
+                author = Some(escape_epub_text(element.text().collect::<String>().as_str()));
                 break;
             }
         }
@@ -123,7 +151,7 @@ pub fn get_meta_data(html: &str) -> BookInfo {
         if let Some(property) = element.value().attr("class") {
             if property == "book-cover" {
                 if let Some(property) = element.value().attr("src") {
-                    cover = Some(property.to_string());
+                    cover = Some(escape_epub_text(property));
                     break;
                 }
             }
@@ -132,15 +160,15 @@ pub fn get_meta_data(html: &str) -> BookInfo {
     for element in document.select(&em_selector) {
         if let Some(property) = element.value().attr("class") {
             if property == "tag-small orange" {
-                publisher = Some(element.text().collect());
+                publisher = Some(escape_epub_text(element.text().collect::<String>().as_str()));
             }
             if property == "tag-small red" {
-                tags.push(element.text().collect());
+                tags.push(escape_epub_text(element.text().collect::<String>().as_str()));
             }
         }
     }
     for element in document.select(&content_selector) {
-        description = Some(element.text().collect());
+        description = Some(escape_epub_text(element.text().collect::<String>().as_str()));
         break;
     }
     BookInfo {
@@ -169,10 +197,10 @@ pub fn get_volume_list(html: &str) -> Vec<VolumeInfo> {
                 for element in element.select(&li_selector) {
                     if let Some(property) = element.value().attr("class") {
                         if property == "chapter-bar chapter-li" {
-                            title = Some(element.text().collect());
+                            title = Some(escape_epub_text(element.text().collect::<String>().as_str()));
                         }
                         if property == "chapter-li jsChapter" {
-                            chapter_list.push(element.text().collect());
+                            chapter_list.push(escape_epub_text(element.text().collect::<String>().as_str()));
                             if let Some(element) = element.select(&a_selector).next() {
                                 chapter_path_list
                                     .push(element.value().attr("href").unwrap().to_string());
@@ -221,16 +249,16 @@ fn get_text(document: &Html, text: &mut Vec<Content>, img_list: &mut Vec<String>
                         }
                     } else if child.value().name().len() > 1 && child.value().name().contains("p") {
                         continue;
-                    } else if child.value().name() == "div" && child.value().attr("class").is_some() {
+                    } else if child.value().name() == "div" && child.value().attr("class").is_some()
+                    {
                         continue;
-                    }
-                     else {
+                    } else {
                         let t: String = child.text().collect();
                         if !t.contains("function")
                             && !t.contains("Note: 请不要")
                             && !t.contains("= window.")
                         {
-                            text.push(Content::Text(t));
+                            text.push(Content::Text(escape_epub_text(&t)));
                         }
                     }
                 }
@@ -276,7 +304,7 @@ impl Downloader {
             &format!("{}/novel/{}.html", url_base, book_id),
             &client,
             &message,
-            0
+            0,
         )?);
         if book_info.title.is_none() {
             return Err("Book not found".to_string());
@@ -285,7 +313,7 @@ impl Downloader {
             &format!("{}/novel/{}/catalog", url_base, book_id),
             &client,
             &message,
-            0
+            0,
         )?);
         Ok(Self {
             url_base,
@@ -344,45 +372,6 @@ impl Downloader {
         Ok(())
     }
 
-    fn get_start_next_url(&self, volume: &VolumeInfo, volume_no: usize) -> Result<String, String> {
-        let mut next_url = self.url_base.clone() + &volume.chapter_path_list[0].clone();
-        if next_url.contains("javascript") {
-            let pre_volume = &self.volume_list[volume_no - 2];
-            let pre_url_path = pre_volume.chapter_path_list.last().unwrap();
-            next_url = self.get_next_chapter_url(&get_html(
-                &(self.url_base.clone() + pre_url_path),
-                &self.client,
-                &self.message,
-                self.sleep_time,
-            )?)?;
-        }
-        Ok(next_url)
-    }
-
-    fn get_next_chapter_url(&self, html: &str) -> Result<String, String> {
-        let url = self.get_next_url(html)?;
-        if url.contains("_") {
-            return self.get_next_chapter_url(&get_html(&url, &self.client, &self.message, self.sleep_time)?);
-        } else {
-            return Ok(url);
-        }
-    }
-
-    fn get_next_url(&self, html: &str) -> Result<String, String> {
-
-        let re = Regex::new(r"url_next:'(.+?)'").unwrap();
-        // 使用正则表达式进行匹配
-        if let Some(captures) = re.captures(html) {
-            // 提取匹配到的第一个分组（即 URL）
-            if let Some(url) = captures.get(1) {
-                return Ok(self.url_base.clone() + url.as_str());
-            }
-        }
-
-        self.message.send("寻找章节链接失败");
-        return Err("寻找章节链接失败".to_string());
-    }
-
     pub fn download_single(&self, volume: &mut VolumeInfo, volume_no: usize) -> Result<(), String> {
         if volume.chapter_path_list.is_empty() {
             self.message.send("章节列表为空");
@@ -413,33 +402,29 @@ impl Downloader {
             text.push(chapter_text);
         }
 
-        if img_url_list.len() == 0 {
-            img_url_list.push(self.book_info.cover.clone().unwrap());
-            ext_list.push(String::from(".") + &self.get_ext(self.book_info.cover.clone().unwrap()));
-        } else {
-            // 插图页提取
-            if volume.chapter_list[0] == "插图" {
-                volume.chapter_list[0] = "彩页".to_string();
-                'outer: for chapter in &mut text {
-                    for i in 0..chapter.len() {
-                        if matches!(chapter[i], Content::Image(_)) {
-                            chapter.remove(i);
-                            ext_list.push(String::from(".") + &self.get_ext(img_url_list[0].clone()));
-                            break 'outer;
-                        }
-                    }
-                }
-            };
-        }
-
-        if volume.chapter_list[0] == "彩页" {
+        if volume.chapter_list[0] == "插图" {
+            volume.chapter_list[0] = "彩页".to_string();
+            // 分离彩页
             let color_page = text.remove(0);
-            let (texts, images): (Vec<_>, Vec<_>) = color_page.into_iter().partition(|content| matches!(content, Content::Text(_)));
-            text.insert(0, images); 
-            if texts.len() > 0 {
+            let (texts, mut images): (Vec<_>, Vec<_>) = color_page
+                .into_iter()
+                .partition(|content| matches!(content, Content::Text(_)));
+            // 分离封面、
+            images.remove(0);
+            ext_list.push(String::from(".") + &self.get_ext(img_url_list[0].clone()));
+            text.insert(0, images);
+            // 添加信息页
+            let filter = texts
+                .iter()
+                .filter(|content| !matches!(content, Content::Text(ref s) if s == ""))
+                .collect::<Vec<_>>();
+            if filter.len() > 0 {
                 text.insert(0, texts);
                 volume.chapter_list.insert(0, "信息".to_string());
             }
+        } else {
+            img_url_list.insert(0, self.book_info.cover.clone().unwrap());
+            ext_list.insert(0, String::from(".") + &self.get_ext(self.book_info.cover.clone().unwrap()));
         }
 
         self.to_html(&mut text, &mut img_url_list, &mut text_html, &mut ext_list);
@@ -471,7 +456,7 @@ impl Downloader {
             subject: self.book_info.tags.clone(),
             language: Some("zh-CN".to_string()),
             index: Some(volume_no),
-            identifier: Some(first_url)
+            identifier: Some(first_url),
         };
         let epub_builder = EpubBuilder::new(
             metadata,
@@ -483,44 +468,55 @@ impl Downloader {
 
         //保存文件
         let path =
-            absolute(self.get_save_path(&volume_no.to_string(), volume.title.as_ref().unwrap())?).unwrap();
+            absolute(self.get_save_path(&volume_no.to_string(), volume.title.as_ref().unwrap())?)
+                .unwrap();
         self.save_file(epub_builder.build_epub(), &path);
         self.message
             .send(&format!("\n  下载完成，保存到: {}", &path.display()));
         Ok(())
     }
 
-    fn download_img(&self, img_url: &str) -> Vec<u8> {
-        let mut client = self.client.get(img_url).header(ACCEPT, "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
-        if img_url.contains("masiro") {
-            client = client.header("Referer", HeaderValue::from_static("https://www.masiro.me/"));
+    fn get_start_next_url(&self, volume: &VolumeInfo, volume_no: usize) -> Result<String, String> {
+        let mut next_url = self.url_base.clone() + &volume.chapter_path_list[0].clone();
+        if next_url.contains("javascript") {
+            let pre_volume = &self.volume_list[volume_no - 2];
+            let pre_url_path = pre_volume.chapter_path_list.last().unwrap();
+            next_url = self.get_next_chapter_url(&get_html(
+                &(self.url_base.clone() + pre_url_path),
+                &self.client,
+                &self.message,
+                self.sleep_time,
+            )?)?;
         }
-        if let Ok(response) = client.send() {
-            let length = response.content_length().unwrap_or(0);
-            let code = response.status().as_u16();
-            let data = response.bytes().unwrap();
+        Ok(next_url)
+    }
 
-            // 数据太小，进行验证
-            if length < 5000 {
-                if code == 404 {
-                    self.message.send(&format!("\n  插图下载失败，404 Not Found {}", img_url));
-                    return Vec::new();
-                }
-                if String::from_utf8(data.clone().to_vec()).is_ok() {
-                    self.message.send("\n  插图下载失败，正在重试");
-                    self.message.send(&format!("  {}", img_url));
-                    sleep(std::time::Duration::from_secs(5));
-                    return self.download_img(img_url);
-                }
-            }
-            if length == data.len() as u64 {
-                return data.to_vec();
+    fn get_next_chapter_url(&self, html: &str) -> Result<String, String> {
+        let url = self.get_next_url(html)?;
+        if url.contains("_") {
+            return self.get_next_chapter_url(&get_html(
+                &url,
+                &self.client,
+                &self.message,
+                self.sleep_time,
+            )?);
+        } else {
+            return Ok(url);
+        }
+    }
+
+    fn get_next_url(&self, html: &str) -> Result<String, String> {
+        let re = Regex::new(r"url_next:'(.+?)'").unwrap();
+        // 使用正则表达式进行匹配
+        if let Some(captures) = re.captures(html) {
+            // 提取匹配到的第一个分组（即 URL）
+            if let Some(url) = captures.get(1) {
+                return Ok(self.url_base.clone() + url.as_str());
             }
         }
-        self.message.send("\n  插图下载失败，正在重试");
-        self.message.send(&format!("  {}", img_url));
-        sleep(std::time::Duration::from_secs(5));
-        return self.download_img(img_url);
+
+        self.message.send("寻找章节链接失败");
+        return Err("寻找章节链接失败".to_string());
     }
 
     fn get_save_path(&self, volume_no: &str, title: &str) -> Result<PathBuf, String> {
@@ -575,6 +571,48 @@ impl Downloader {
         img_data_list
     }
 
+    fn download_img(&self, img_url: &str) -> Vec<u8> {
+        let mut client = self.client.get(img_url).header(
+            ACCEPT,
+            "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        );
+        if img_url.contains("masiro") {
+            client = client.header(
+                "Referer",
+                HeaderValue::from_static("https://www.masiro.me/"),
+            );
+        }
+        if let Ok(response) = client.send() {
+            let length = response.content_length().unwrap_or(0);
+            let code = response.status().as_u16();
+            let data = response.bytes().unwrap();
+
+            if code == 404 {
+                self.message
+                    .send(&format!("\n  插图下载失败，404 Not Found {}", img_url));
+                return Vec::new();
+            }
+
+            if length != data.len() as u64 {
+                return self.download_img(img_url);
+            }
+
+            return match utils::img_to_jpg(data.to_vec()) {
+                Ok(data) => data,
+                Err(_) => {
+                    self.message.send("\n  插图下载失败，正在重试");
+                    self.message.send(&format!("  {}", img_url));
+                    sleep(std::time::Duration::from_secs(5));
+                    self.download_img(img_url)
+                }
+            };
+        }
+        self.message.send("\n  插图下载失败，正在重试");
+        self.message.send(&format!("  {}", img_url));
+        sleep(std::time::Duration::from_secs(5));
+        self.download_img(img_url)
+    }
+
     fn save_file(&self, file_map: HashMap<String, Vec<u8>>, path: &PathBuf) {
         let zip_file = File::create(path).unwrap();
         let mut zip_writer = zip::ZipWriter::new(zip_file);
@@ -589,9 +627,7 @@ impl Downloader {
 
     fn get_ext(&self, url: String) -> String {
         let mut url = url;
-        let suffixes = vec![
-            ".jpg", ".png", ".jpeg", ".gif", ".bmp", ".webp", ".svg", ".avif", ".tiff", ".tif",
-        ];
+        let suffixes = vec![".jpg", ".png", ".jpeg"];
         if !url.starts_with("http") {
             url = self.url_base.clone() + &url;
         }
@@ -624,7 +660,7 @@ impl Downloader {
                             remove_list.push(i);
                         } else {
                             let ext = self.get_ext(url.clone());
-                            
+
                             if url.starts_with("//") {
                                 img_url_list[index] = format!("https:{}", url);
                             }
