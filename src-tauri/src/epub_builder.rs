@@ -113,10 +113,10 @@ impl EpubBuilder {
         for i in 0..self.chapter_list.len() {
             nav_map.push(format!(
                 r#"<navPoint id="navPoint-{}" playOrder="{}">
-        <navLabel>
-            <text>{}</text>
-        </navLabel>
-        <content src="{}" />
+      <navLabel>
+        <text>{}</text>
+      </navLabel>
+      <content src="{}" />
     </navPoint>"#,
                 i + 1,
                 i + 1,
@@ -124,7 +124,7 @@ impl EpubBuilder {
                 format!("Text/{}.xhtml", self.num_fill(i + 1)),
             ));
         }
-        nav_map.join("\n\t")
+        nav_map.join("\n    ")
     }
 
     fn build_opf(&self) -> String {
@@ -135,18 +135,18 @@ impl EpubBuilder {
         format!(
             r#"<?xml version="1.0" encoding="utf-8"?>
 <package version="3.0" unique-identifier="BookId" xmlns="http://www.idpf.org/2007/opf">
-    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
-        {}
-    </metadata>
-    <manifest>
-        {}
-    </manifest>
-    <spine toc="ncx">
-        {}
-    </spine>
-    <guide>
-        {}
-    </guide>
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+    {}
+  </metadata>
+  <manifest>
+    {}
+  </manifest>
+  <spine toc="ncx">
+    {}
+  </spine>
+  <guide>
+    {}
+  </guide>
 </package>"#,
             metadata, manifest, spine, guide
         )
@@ -155,7 +155,7 @@ impl EpubBuilder {
     fn get_guide_xml(&self) -> String {
         let mut guide = Vec::new();
         guide.push("<reference href=\"Text/cover.xhtml\" title=\"Cover\" type=\"cover\"/>");
-        guide.join("\n\t\t")
+        guide.join("\n    ")
     }
 
     fn get_spine_xml(&self) -> String {
@@ -168,7 +168,7 @@ impl EpubBuilder {
                 self.num_fill(i + 1)
             ));
         }
-        spine.join("\n\t\t")
+        spine.join("\n    ")
     }
 
     fn get_manifest_xml(&self) -> String {
@@ -196,7 +196,7 @@ impl EpubBuilder {
         }
         manifest.push(r#"<item id="nav.xhtml" href="Text/nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>"#.to_string());
         manifest.push(r#"<item id="sgc-nav.css" href="Styles/sgc-nav.css" media-type="text/css"/>"#.to_string());
-        manifest.join("\n\t\t")
+        manifest.join("\n    ")
     }
 
     fn get_metadata_xml(&self) -> String {
@@ -241,35 +241,34 @@ impl EpubBuilder {
             ));
         }
 
-        metadata.join("\n\t\t")
+        metadata.join("\n    ")
     }
 
     fn build_container(&self) -> String {
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
-    <rootfiles>
-        <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml" />
-    </rootfiles>
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml" />
+  </rootfiles>
 </container>"#
             .to_string()
     }
 
     fn build_xhtml(&self, title: &str, body: &str) -> String {
+        let title = if title != "彩页" { format!("<h1>{}</h1>\n    ", title) } else { String::new() };
         format!(
             r#"<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
-    <head>
-        <title>{}</title>
-        <style type="text/css">p{{text-indent:2em;}}</style>
-    </head>
-    <body>
-        <h1>{}</h1>
-        {}
-    </body>
-</html>"#,
-            title, title, body
+  <head>
+    <title>{}</title>
+    <style type="text/css">p{{text-indent:2em;}}</style>
+  </head>
+  <body>
+    {}{}
+  </body>
+</html>"#, title, title, body
         )
     }
 
@@ -316,11 +315,11 @@ impl EpubBuilder {
   <nav epub:type="toc" id="toc" role="doc-toc">
     <h1>目录</h1>
     <ol>
-        {}
+      {}
     </ol>
   </nav>
 </body>
-</html>"#, nav_map.join("\n\t\t"))
+</html>"#, nav_map.join("\n      "))
     }
 
     fn build_sgc_nav_css(&self) -> (String, Vec<u8>) {

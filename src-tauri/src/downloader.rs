@@ -89,8 +89,11 @@ fn get_html(
             }
             if text.contains("Just a moment...") || text.contains("403 Forbidden") {
                 message.send("下载失败，请稍后再试");
-                message.send(&text);
                 return Err("下载失败，请稍后再试".to_string());
+            }
+            if text.contains("對不起，該書內容已刪除") || text.contains("对不起，该书内容已删除") {
+                message.send("该书内容已删除");
+                return Err("该书内容已删除".to_string());
             }
             if text.contains("通告～客戶端停用中")
                 || text.contains("通告～客户端停用中")
@@ -253,12 +256,17 @@ fn get_text(document: &Html, text: &mut Vec<Content>, img_list: &mut Vec<String>
                     {
                         continue;
                     } else {
-                        let t: String = child.text().collect();
+                        let t: String = child.text().collect::<String>().trim().to_string();
+                        let html = child.html();
                         if !t.contains("function")
                             && !t.contains("Note: 请不要")
                             && !t.contains("= window.")
                         {
-                            text.push(Content::Text(escape_epub_text(&t)));
+                            if t.is_empty() {
+                                text.push(Content::Text("<br/>".to_string()));
+                            } else {
+                                text.push(Content::Text(html.replace(&t, &escape_epub_text(&t))));
+                            }
                         }
                     }
                 }
@@ -674,13 +682,7 @@ impl Downloader {
                             ext_list.push(String::from(".") + &ext);
                         }
                     }
-                    Content::Text(text) => {
-                        if text == "" {
-                            chapter[i] = Content::Text("<br/>".to_string());
-                        } else {
-                            chapter[i] = Content::Text(format!("<p>{}</p>", text.trim()));
-                        }
-                    }
+                    Content::Text(_) => {}
                 }
             }
             for i in remove_list.iter().rev() {
@@ -698,7 +700,7 @@ impl Downloader {
                 Content::Image(s) => s.clone(),
             })
             .collect::<Vec<String>>()
-            .join("\n\t\t");
+            .join("\n    ");
     }
 
     fn get_chapter_text(
