@@ -1,7 +1,7 @@
 use crate::epub_builder::{EpubBuilder, MetaData};
 use crate::model::{BookInfo, Message, VolumeInfo};
 use crate::secret::{decode_text, get_secret_map};
-use crate::utils::{remove_invalid_chars, t2s, escape_epub_text};
+use crate::utils::{escape_epub_text, remove_invalid_chars, t2s};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs::{create_dir_all, File};
@@ -16,6 +16,11 @@ use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, COOKIE, U
 use scraper::{Html, Selector};
 use zip::write::SimpleFileOptions;
 use zip::CompressionMethod;
+
+const ERROR_IMG: [&str; 2] = [
+    "https://www.xlcx996.xyz/image/novel/sister01.jpg", // 3273/167199.html
+    "「<img", // 1744/180492.html
+];
 
 fn get_headers(referer: &str, cookie: &str) -> HeaderMap {
     let mut headers = HeaderMap::new();
@@ -91,7 +96,8 @@ fn get_html(
                 message.send("下载失败，请稍后再试");
                 return Err("下载失败，请稍后再试".to_string());
             }
-            if text.contains("對不起，該書內容已刪除") || text.contains("对不起，该书内容已删除") {
+            if text.contains("對不起，該書內容已刪除") || text.contains("对不起，该书内容已删除")
+            {
                 message.send("该书内容已删除");
                 return Err("该书内容已删除".to_string());
             }
@@ -137,7 +143,9 @@ pub fn get_meta_data(html: &str) -> BookInfo {
     for element in document.select(&h1_selector) {
         if let Some(property) = element.value().attr("class") {
             if property == "book-title" {
-                title = Some(escape_epub_text(element.text().collect::<String>().as_str()));
+                title = Some(escape_epub_text(
+                    element.text().collect::<String>().as_str(),
+                ));
                 break;
             }
         }
@@ -145,7 +153,9 @@ pub fn get_meta_data(html: &str) -> BookInfo {
     for element in document.select(&span_selector) {
         if let Some(property) = element.value().attr("class") {
             if property == "authorname" {
-                author = Some(escape_epub_text(element.text().collect::<String>().as_str()));
+                author = Some(escape_epub_text(
+                    element.text().collect::<String>().as_str(),
+                ));
                 break;
             }
         }
@@ -163,15 +173,21 @@ pub fn get_meta_data(html: &str) -> BookInfo {
     for element in document.select(&em_selector) {
         if let Some(property) = element.value().attr("class") {
             if property == "tag-small orange" {
-                publisher = Some(escape_epub_text(element.text().collect::<String>().as_str()));
+                publisher = Some(escape_epub_text(
+                    element.text().collect::<String>().as_str(),
+                ));
             }
             if property == "tag-small red" {
-                tags.push(escape_epub_text(element.text().collect::<String>().as_str()));
+                tags.push(escape_epub_text(
+                    element.text().collect::<String>().as_str(),
+                ));
             }
         }
     }
     for element in document.select(&content_selector) {
-        description = Some(escape_epub_text(element.text().collect::<String>().as_str()));
+        description = Some(escape_epub_text(
+            element.text().collect::<String>().as_str(),
+        ));
         break;
     }
     BookInfo {
@@ -200,10 +216,14 @@ pub fn get_volume_list(html: &str) -> Vec<VolumeInfo> {
                 for element in element.select(&li_selector) {
                     if let Some(property) = element.value().attr("class") {
                         if property == "chapter-bar chapter-li" {
-                            title = Some(escape_epub_text(element.text().collect::<String>().as_str()));
+                            title = Some(escape_epub_text(
+                                element.text().collect::<String>().as_str(),
+                            ));
                         }
                         if property == "chapter-li jsChapter" {
-                            chapter_list.push(escape_epub_text(element.text().collect::<String>().as_str()));
+                            chapter_list.push(escape_epub_text(
+                                element.text().collect::<String>().as_str(),
+                            ));
                             if let Some(element) = element.select(&a_selector).next() {
                                 chapter_path_list
                                     .push(element.value().attr("href").unwrap().to_string());
@@ -243,8 +263,7 @@ fn get_text(document: &Html, text: &mut Vec<Content>, img_list: &mut Vec<String>
                             img = Some(src.to_string());
                         }
                         if let Some(img) = img {
-                            // 排除1744/180492.html的错误img标签
-                            if img.len() < 8 {
+                            if ERROR_IMG.contains(&img.as_str()) {
                                 continue;
                             }
                             text.push(Content::Image(img.clone()));
@@ -380,7 +399,7 @@ impl Downloader {
         Ok(())
     }
 
-    pub fn download_single(&self, volume: &mut VolumeInfo, volume_no: usize) -> Result<(), String> {
+    fn download_single(&self, volume: &mut VolumeInfo, volume_no: usize) -> Result<(), String> {
         if volume.chapter_path_list.is_empty() {
             self.message.send("章节列表为空");
             return Ok(());
@@ -432,10 +451,24 @@ impl Downloader {
             }
         } else {
             img_url_list.insert(0, self.book_info.cover.clone().unwrap());
-            ext_list.insert(0, String::from(".") + &self.get_ext(self.book_info.cover.clone().unwrap()));
+            ext_list.insert(
+                0,
+                String::from(".") + &self.get_ext(self.book_info.cover.clone().unwrap()),
+            );
         }
 
         self.to_html(&mut text, &mut img_url_list, &mut text_html, &mut ext_list);
+
+        let mut remove_list = Vec::new();
+        for i in 0..text_html.len() {
+            if text_html[i].split("<br/>").all(|s| s.is_empty()) {
+                remove_list.push(i);
+            }
+        }
+        for i in remove_list.iter().rev() {
+            text_html.remove(*i);
+            volume.chapter_list.remove(*i);
+        }
 
         if img_url_list.len() != ext_list.len() {
             self.message.send("图片数量与扩展名数量不匹配");
@@ -592,14 +625,14 @@ impl Downloader {
         }
         if let Ok(response) = client.send() {
             let length = response.content_length().unwrap_or(0);
-            let code = response.status().as_u16();
+            // let code = response.status().as_u16();
             let data = response.bytes().unwrap();
 
-            if code == 404 {
-                self.message
-                    .send(&format!("\n  插图下载失败，404 Not Found {}", img_url));
-                return Vec::new();
-            }
+            // if code == 404 {
+            //     self.message
+            //         .send(&format!("\n  插图下载失败，404 Not Found {}", img_url));
+            //     return Vec::new();
+            // }
 
             if length != data.len() as u64 {
                 return self.download_img(img_url);
