@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::{read_to_string, write};
 use std::sync::{Mutex, OnceLock};
 
@@ -8,6 +9,10 @@ pub struct Config {
     pub cookie: String,
     pub sleep_time: u64,
     pub url_base: String,
+    #[serde(default)]
+    pub add_catalog: bool,
+    #[serde(default)]
+    pub error_img: HashSet<String>,
 }
 
 impl Config {
@@ -18,6 +23,8 @@ impl Config {
             cookie: String::from(""),
             sleep_time: 8,
             url_base: String::from("https://www.bilinovel.com"),
+            add_catalog: false,
+            error_img: HashSet::new(),
         }
     }
 }
@@ -42,10 +49,12 @@ pub fn get_config() -> std::sync::MutexGuard<'static, Config> {
     .unwrap()
 }
 
-pub fn update_config(new_config: Config) {
+pub fn update_config(mut new_config: Config) {
+    new_config.error_img = get_config().error_img.clone();
     if let Some(mutex) = CONFIG.get() {
         let mut config = mutex.lock().unwrap();
-        *config = new_config;
+        let original_config = std::mem::replace(&mut *config, new_config);
+        config.error_img = original_config.error_img;
     }
 }
 

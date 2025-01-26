@@ -1,5 +1,8 @@
-use std::collections::HashMap;
 use chrono::Utc;
+use std::fs::create_dir_all;
+use std::path::Path;
+use std::{collections::HashMap, fs::File, io::Write};
+use zip::{write::SimpleFileOptions, CompressionMethod};
 
 #[derive(Default, Debug)]
 pub struct MetaData {
@@ -14,12 +17,45 @@ pub struct MetaData {
     pub identifier: Option<String>,
 }
 
+impl MetaData {
+    pub fn new(
+        title: &str,
+        creator: Option<&str>,
+        publisher: Option<&str>,
+        description: Option<&str>,
+        series: Option<&str>,
+        subject: Vec<String>,
+        language: Option<&str>,
+        index: Option<usize>,
+        identifier: Option<&str>,
+    ) -> Self {
+        let title = escape_epub_text(title);
+        let creator = creator.map(|c| escape_epub_text(c));
+        let publisher = publisher.map(|p| escape_epub_text(p));
+        let description = description.map(|d| escape_epub_text(d));
+        let series = series.map(|s| escape_epub_text(s));
+        let language = language.map(|l| escape_epub_text(l));
+        let identifier = identifier.map(|i| escape_epub_text(i));
+        Self {
+            title,
+            creator,
+            publisher,
+            description,
+            series,
+            subject,
+            language,
+            index,
+            identifier,
+        }}
+}
+
 pub struct EpubBuilder {
     metadata: MetaData,
     text: Vec<String>,
     chapter_list: Vec<String>,
     img_data_list: Vec<Vec<u8>>,
     ext_list: Vec<String>,
+    add_catalog: bool,
 }
 
 impl EpubBuilder {
@@ -29,6 +65,7 @@ impl EpubBuilder {
         chapter_list: Vec<String>,
         img_data_list: Vec<Vec<u8>>,
         ext_list: Vec<String>,
+        add_catalog: bool,
     ) -> Self {
         EpubBuilder {
             metadata,
@@ -36,6 +73,7 @@ impl EpubBuilder {
             chapter_list,
             img_data_list,
             ext_list,
+            add_catalog,
         }
     }
 
@@ -81,8 +119,42 @@ impl EpubBuilder {
                 self.img_data_list[i].clone(),
             );
         }
-        add_file(&mut epub, self.build_sgc_nav_css());
+        if self.add_catalog {
+            add_file(&mut epub, self.build_sgc_nav_css());
+        }
         epub
+    }
+
+    pub fn save_file(&self, path: &Path) -> Result<(), String> {
+        self.create_dir(path.parent())?;
+        let mut file_map = self.build_epub();
+
+        let zip_file = File::create(path).unwrap();
+        let mut zip_writer = zip::ZipWriter::new(zip_file);
+        // 设置默认的文件压缩选项
+        let mimetype_options =
+            SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+        let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+
+        let mimetype = file_map.remove("mimetype").unwrap();
+        zip_writer.start_file("mimetype", mimetype_options).unwrap();
+        zip_writer.write_all(&mimetype).unwrap();
+
+        for (file_name, file_data) in file_map {
+            zip_writer.start_file(file_name, options).unwrap();
+            zip_writer.write_all(&file_data).unwrap();
+        }
+        zip_writer.finish().unwrap();
+        Ok(())
+    }
+
+    fn create_dir(&self, dir: Option<&Path>) -> Result<(), String> {
+        if let Some(dir) = dir {
+            if let Err(_) = create_dir_all(dir) {
+                return Err(String::from("创建目录失败"));
+            }
+        }
+        Ok(())
     }
 
     fn build_ncx(&self) -> String {
@@ -161,7 +233,8 @@ impl EpubBuilder {
     fn get_spine_xml(&self) -> String {
         let mut spine = Vec::new();
         spine.push(format!("<itemref idref=\"cover.xhtml\"/>"));
-        spine.push(format!("<itemref idref=\"nav.xhtml\"/>"));
+        // 添加目录页
+        // spine.push(format!("<itemref idref=\"nav.xhtml\"/>"));
         for i in 0..self.chapter_list.len() {
             spine.push(format!(
                 "<itemref idref=\"x{}.xhtml\"/>",
@@ -195,7 +268,10 @@ impl EpubBuilder {
             ));
         }
         manifest.push(r#"<item id="nav.xhtml" href="Text/nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>"#.to_string());
-        manifest.push(r#"<item id="sgc-nav.css" href="Styles/sgc-nav.css" media-type="text/css"/>"#.to_string());
+        manifest.push(
+            r#"<item id="sgc-nav.css" href="Styles/sgc-nav.css" media-type="text/css"/>"#
+                .to_string(),
+        );
         manifest.join("\n    ")
     }
 
@@ -215,7 +291,10 @@ impl EpubBuilder {
             metadata.push(format!("<dc:language>{}</dc:language>", language));
         }
         if let Some(identifier) = &self.metadata.identifier {
-            metadata.push(format!("<dc:identifier id=\"BookId\">{}</dc:identifier>", identifier));
+            metadata.push(format!(
+                "<dc:identifier id=\"BookId\">{}</dc:identifier>",
+                identifier
+            ));
         }
         metadata.push(
             self.metadata
@@ -225,9 +304,15 @@ impl EpubBuilder {
                 .collect::<Vec<String>>()
                 .join("\n\t\t"),
         );
-        metadata.push(format!("<meta property=\"dcterms:modified\">{}</meta>", get_time()));
+        metadata.push(format!(
+            "<meta property=\"dcterms:modified\">{}</meta>",
+            get_time()
+        ));
 
-        metadata.push(format!("<meta name=\"cover\" content=\"x000.{}\"/>", self.ext_list[0].trim_start_matches('.')));
+        metadata.push(format!(
+            "<meta name=\"cover\" content=\"x000.{}\"/>",
+            self.ext_list[0].trim_start_matches('.')
+        ));
         if let Some(series) = &self.metadata.series {
             metadata.push(format!(
                 "<meta name=\"calibre:series\" content=\"{}\"/>",
@@ -255,7 +340,11 @@ impl EpubBuilder {
     }
 
     fn build_xhtml(&self, title: &str, body: &str) -> String {
-        let title = if title != "彩页" { format!("<h1>{}</h1>\n    ", title) } else { String::new() };
+        let title_tag = if title != "彩页" {
+            format!("<h1>{}</h1>\n    ", title)
+        } else {
+            String::new()
+        };
         format!(
             r#"<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
@@ -268,7 +357,8 @@ impl EpubBuilder {
   <body>
     {}{}
   </body>
-</html>"#, title, title, body
+</html>"#,
+            title, title_tag, body
         )
     }
 
@@ -296,20 +386,32 @@ impl EpubBuilder {
     }
 
     fn build_nav_xhtml(&self) -> String {
+        let css = if self.add_catalog {
+            format!(
+                "\n  {}",
+                r#"<link href="../Styles/sgc-nav.css" rel="stylesheet" type="text/css"/>"#
+            )
+        } else {
+            String::new()
+        };
         let mut nav_map = Vec::new();
 
         for i in 0..self.chapter_list.len() {
-            nav_map.push(format!("<li><a href=\"{}.xhtml\">{}</a></li>", self.num_fill(i + 1), self.chapter_list[i]));
+            nav_map.push(format!(
+                "<li><a href=\"{}.xhtml\">{}</a></li>",
+                self.num_fill(i + 1),
+                self.chapter_list[i]
+            ));
         }
 
-        format!(r#"<?xml version="1.0" encoding="utf-8"?>
+        format!(
+            r#"<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en" xml:lang="en">
 <head>
   <title>ePub NAV</title>
-  <meta charset="utf-8"/>
-  <link href="../Styles/sgc-nav.css" rel="stylesheet" type="text/css"/>
+  <meta charset="utf-8"/>{}
 </head>
 <body epub:type="frontmatter">
   <nav epub:type="toc" id="toc" role="doc-toc">
@@ -319,12 +421,17 @@ impl EpubBuilder {
     </ol>
   </nav>
 </body>
-</html>"#, nav_map.join("\n      "))
+</html>"#,
+            css,
+            nav_map.join("\n      ")
+        )
     }
 
     fn build_sgc_nav_css(&self) -> (String, Vec<u8>) {
         let file_path = String::from("OEBPS/Styles/sgc-nav.css");
-        (file_path, r#"nav#toc {
+        (
+            file_path,
+            r#"nav#toc {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   padding: 20px;
   background-color: #f8f8f8; /* 浅灰色背景 */
@@ -363,10 +470,12 @@ nav#toc ol li a:hover {
   background-color: #d9d9d9;
   color: #000;
 }
-"#.as_bytes().to_vec())
+"#
+            .as_bytes()
+            .to_vec(),
+        )
     }
 }
-
 
 fn add_file(epub: &mut HashMap<String, Vec<u8>>, file: (String, Vec<u8>)) {
     epub.insert(file.0, file.1);
@@ -380,5 +489,11 @@ fn get_time() -> String {
     let iso8601_time = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
 
     iso8601_time
+}
 
+pub fn escape_epub_text(input: &str) -> String {
+    input
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
 }

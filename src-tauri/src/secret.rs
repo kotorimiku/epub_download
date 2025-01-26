@@ -1,9 +1,26 @@
 use std::collections::HashMap;
+use std::sync::OnceLock;
 
-pub fn decode_text(str: &str, map: &HashMap<String, String>) -> String {
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn it_works() {
+        print!("{}", super::decode_text("紧细，冗纺妹擒阴，坯绎榜舱使。"))
+    }
+}
+
+static SECRET_MAP: OnceLock<HashMap<String, String>> = OnceLock::new();
+
+
+pub fn get_secret_map() -> &'static HashMap<String, String> {
+    SECRET_MAP.get_or_init(|| {get_secret_map_()})
+}
+
+pub fn decode_text(str: &str) -> String {
   let mut result = String::new();
   for char in str.chars() {
-      if let Some(value) = map.get(&char.to_string()) {
+      if let Some(value) = get_secret_map().get(&char.to_string()) {
           result.push_str(value);
       } else {
           result.push(char);
@@ -12,7 +29,7 @@ pub fn decode_text(str: &str, map: &HashMap<String, String>) -> String {
   result
 }
 
-pub fn get_secret_map() -> HashMap<String, String> {
+pub fn get_secret_map_() -> HashMap<String, String> {
     let json_data = r#"
     {
   "": "狼",

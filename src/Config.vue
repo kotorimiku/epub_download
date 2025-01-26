@@ -18,8 +18,13 @@
         </div>
         <div class="form-item">
             <label>命名方式</label>
-            <button class="btn toggle-btn" @click="changeLabel" title="影响命名方式，为true时，会添加[book_id]和[volume_no]到文件名中">{{
+            <button class="btn" @click="changeLabel" title="影响命名方式，为true时，会添加[book_id]和[volume_no]到文件名中">{{
                 addNumber ? '添加序号' : '取消序号' }}</button>
+        </div>
+        <div class="form-item">
+            <label>是否添加目录页</label>
+            <button class="btn" @click="changeCatalog">{{
+                addCatalog ? '添加目录页' : '取消目录页' }}</button>
         </div>
         <!-- 新增保存配置按钮 -->
         <div class="form-item">
@@ -38,10 +43,15 @@ const urlBase = ref<string>("")
 const sleepTime = ref<number>(8)
 const cookie = ref<string>("")
 const outputPath = ref<string>("")
+const addCatalog = ref(false)
 const toast = useToast();
 
 const changeLabel = () => {
     addNumber.value = !addNumber.value
+}
+
+const changeCatalog = () => {
+    addCatalog.value = !addCatalog.value
 }
 
 const urlBaseChange = () => {
@@ -147,11 +157,6 @@ label {
 
 .btn:hover {
     background-color: #f1f1f1;
-}
-
-.toggle-btn {
-    width: 100px;
-    text-align: center;
 }
 
 .save-btn {
