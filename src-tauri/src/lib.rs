@@ -5,6 +5,7 @@ mod epub_builder;
 mod model;
 mod secret;
 mod utils;
+mod client;
 
 use config::{get_config, update_config, Config};
 use downloader::Downloader;

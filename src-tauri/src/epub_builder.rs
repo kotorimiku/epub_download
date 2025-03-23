@@ -268,10 +268,12 @@ impl EpubBuilder {
             ));
         }
         manifest.push(r#"<item id="nav.xhtml" href="Text/nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>"#.to_string());
-        manifest.push(
-            r#"<item id="sgc-nav.css" href="Styles/sgc-nav.css" media-type="text/css"/>"#
-                .to_string(),
-        );
+        if self.add_catalog {
+            manifest.push(
+                r#"<item id="sgc-nav.css" href="Styles/sgc-nav.css" media-type="text/css"/>"#
+                    .to_string(),
+            );
+        }
         manifest.join("\n    ")
     }
 
