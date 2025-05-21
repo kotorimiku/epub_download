@@ -1,7 +1,7 @@
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, COOKIE, USER_AGENT};
 use reqwest::blocking::Client;
 
-fn get_headers(referer: &str, cookie: &str) -> HeaderMap {
+pub fn get_headers(referer: &str, cookie: &str) -> HeaderMap {
     let mut headers = HeaderMap::new();
     headers.insert(USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Linux; Android 11; M2102J20SG) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Mobile Safari/537.36 EdgA/97.0.1072.78"));
     headers.insert(
@@ -59,17 +59,18 @@ mod test {
 
     #[test]
     fn image() {
-        let client = get_client("https://tw.linovelib.com/", "night=1; Hm_lvt_1251eb70bc6856bd02196c68e198ee56=1742750685; Hm_lpvt_1251eb70bc6856bd02196c68e198ee56=1742750685; HMACCOUNT=2462002A73F462C9; _ga_NG72YQN6TX=GS1.1.1742750685.1.0.1742750685.0.0.0; _ga=GA1.1.273351663.1742750685; cf_clearance=nblxnZRmKyZVZPA8YS_q3V4wFzaDJVQvjBFnugYy7ZA-1742750601-1.2.1.1-vA1547Vr1ZpsDeNUNtBOmf9JExhoFxHal6kJdI58a5Sn8a9vKLtHdr.NrmtQ3dKqgDijqW_3GGxPcPEZyMZ4NFgu3uhiirR01QRySRx6fVW.7LEkV65O_EXuhqqCUFrPk8c.mHt7.YaCvHP2qGoyrhD79lhL0wv4OJdOvD2ikw6bz6d25504NtVXEspihjfUt_gOg9kr5UpFPCUOsE9_9yPi_Mu9pxUccreekjjenccueKFxW3StfgFoR7in.EeYfgMmevaRn3n4M5d4j7izmXGvWLxc_S2xgMLLTQU15_2ACAN4caZ2vlIcuECkxvbkY3XhAwjPdy2CVgKbeI4q.31BX6O8RXa8VFJrenTsGoh97OaVAw4ebTphPJo2dIdAioFZLAI81tMNAyw16RQpfPtMfJBaQc11JMx567ILJs0");
-        let client = client.get("https://img3.readpai.com/0/23/110380/136701.jpg").header(
+        let client = get_client("https://www.bilinovel.com/", "night=1; Hm_lvt_1251eb70bc6856bd02196c68e198ee56=1742750685; Hm_lpvt_1251eb70bc6856bd02196c68e198ee56=1742750685; HMACCOUNT=2462002A73F462C9; _ga_NG72YQN6TX=GS1.1.1742750685.1.0.1742750685.0.0.0; _ga=GA1.1.273351663.1742750685; cf_clearance=nblxnZRmKyZVZPA8YS_q3V4wFzaDJVQvjBFnugYy7ZA-1742750601-1.2.1.1-vA1547Vr1ZpsDeNUNtBOmf9JExhoFxHal6kJdI58a5Sn8a9vKLtHdr.NrmtQ3dKqgDijqW_3GGxPcPEZyMZ4NFgu3uhiirR01QRySRx6fVW.7LEkV65O_EXuhqqCUFrPk8c.mHt7.YaCvHP2qGoyrhD79lhL0wv4OJdOvD2ikw6bz6d25504NtVXEspihjfUt_gOg9kr5UpFPCUOsE9_9yPi_Mu9pxUccreekjjenccueKFxW3StfgFoR7in.EeYfgMmevaRn3n4M5d4j7izmXGvWLxc_S2xgMLLTQU15_2ACAN4caZ2vlIcuECkxvbkY3XhAwjPdy2CVgKbeI4q.31BX6O8RXa8VFJrenTsGoh97OaVAw4ebTphPJo2dIdAioFZLAI81tMNAyw16RQpfPtMfJBaQc11JMx567ILJs0");
+        let client = client.get("https://www.bilinovel.com/novel/9/2041_4.html").header(
             ACCEPT,
             "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
         );
         let res = client.send().unwrap();
-        let length = res.content_length().unwrap_or(0);
-        println!("length: {}", length);
-        File::create("test.jpg")
-            .unwrap()
-            .write_all(&res.bytes().unwrap())
-            .unwrap();
+        // let length = res.content_length().unwrap_or(0);
+        // println!("length: {}", length);
+        // File::create("test.jpg")
+        //     .unwrap()
+        //     .write_all(&res.bytes().unwrap())
+        //     .unwrap();
+        println!("content: {:?}", res.text().unwrap());
     }
 }

@@ -1,11 +1,11 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-mod config;
-mod downloader;
-mod epub_builder;
-mod model;
-mod secret;
-mod utils;
-mod client;
+pub mod config;
+pub mod downloader;
+pub mod epub_builder;
+pub mod model;
+pub mod secret;
+pub mod utils;
+pub mod client;
 
 use config::{get_config, update_config, Config};
 use downloader::Downloader;
@@ -24,7 +24,7 @@ async fn get_book_info(
             book_id,
             config.output_path.clone(),
             config.add_number,
-            Message::new(app),
+            Message::new(Some(app)),
             config.sleep_time,
             &config.cookie,
             config.add_catalog,
@@ -56,7 +56,7 @@ async fn download(
             book_info,
             volume_list,
             config.add_number,
-            Message::new(app),
+            Message::new(Some(app)),
             config.sleep_time,
             &config.cookie,
             config.add_catalog,

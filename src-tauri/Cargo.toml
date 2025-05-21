@@ -30,6 +30,7 @@ regex = "1.11.1"
 chrono = "0.4.39"
 fast2s = "0.3.1"
 image = "0.25.5"
+clap = { version = "4.5.23", features = ["derive"] }
 
 [profile.release]
 strip = true

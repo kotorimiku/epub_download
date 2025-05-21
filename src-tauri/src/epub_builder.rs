@@ -259,12 +259,20 @@ impl EpubBuilder {
         // image
         for i in 0..self.img_data_list.len() {
             let ext = self.ext_list[i].split('.').last().unwrap();
+            let media_type = if ext == "png" {
+                "image/png"
+            }
+            else {
+                "image/jpeg"
+            };
+
             manifest.push(format!(
-                "<item id=\"x{}.{}\" href=\"Images/{}.{}\" media-type=\"image/jpeg\"/>",
+                "<item id=\"x{}.{}\" href=\"Images/{}.{}\" media-type=\"{}\"/>",
                 self.num_fill(i),
                 ext,
                 self.num_fill(i),
-                ext
+                ext,
+                media_type
             ));
         }
         manifest.push(r#"<item id="nav.xhtml" href="Text/nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>"#.to_string());

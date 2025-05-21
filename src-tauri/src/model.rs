@@ -16,22 +16,31 @@ pub struct VolumeInfo {
     pub title: Option<String>,
     pub chapter_list: Vec<String>,
     pub chapter_path_list: Vec<String>,
+    pub url_vol: Option<String>,
 }
 
 pub struct Message {
-    app: tauri::AppHandle,
+    app: Option<tauri::AppHandle>,
 }
 
 impl Message {
-    pub fn new(app: tauri::AppHandle) -> Self {
+    pub fn new(app: Option<tauri::AppHandle>) -> Self {
         Message { app }
     }
     pub fn send(&self, msg: &str) {
-        // println!("{}", msg);
-        self.app.emit("message", msg).unwrap();
+        if let Some(app) = &self.app {
+            app.emit("message", msg).unwrap();
+        }
+        else {
+            println!("{}", msg);
+        }
     }
     pub fn print(&self, msg: &str) {
-        // println!("{}", msg);
-        self.app.emit("image", msg).unwrap();
+        if let Some(app) = &self.app {
+            app.emit("image", msg).unwrap();
+        }
+        else {
+            print!("{}", msg);
+        }
     }
 }

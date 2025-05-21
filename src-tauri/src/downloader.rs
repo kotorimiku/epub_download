@@ -9,11 +9,11 @@ use std::path::PathBuf;
 use std::path::{self, absolute};
 use std::thread::sleep;
 // use reqwest::cookie::Jar;
+use crate::client::*;
 use crate::utils;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderValue, ACCEPT};
 use scraper::{Html, Selector};
-use crate::client::*;
 
 const ERROR_IMG: [&str; 8] = [
     "https://www.xlcx996.xyz/image/novel/sister01.jpg", // 3273/167199.html
@@ -160,12 +160,18 @@ pub fn get_volume_list(html: &str) -> Vec<VolumeInfo> {
         if let Some(property) = element.value().attr("class") {
             if property == "volume-chapters" {
                 let mut title = None;
+                let mut url_vol = None;
                 let mut chapter_list: Vec<String> = Vec::new();
                 let mut chapter_path_list = Vec::new();
                 for element in element.select(&li_selector) {
                     if let Some(property) = element.value().attr("class") {
                         if property == "chapter-bar chapter-li" {
                             title = Some(element.text().collect::<String>());
+                        }
+                        if property == "volume-cover chapter-li" {
+                            if let Some(element) = element.select(&a_selector).next() {
+                                url_vol = Some(element.value().attr("href").unwrap().to_string());
+                            }
                         }
                         if property == "chapter-li jsChapter" {
                             chapter_list.push(element.text().collect::<String>());
@@ -180,6 +186,7 @@ pub fn get_volume_list(html: &str) -> Vec<VolumeInfo> {
                     title,
                     chapter_list,
                     chapter_path_list,
+                    url_vol,
                 });
             }
         }
@@ -193,7 +200,13 @@ enum Content {
     Image(String),
 }
 
-fn get_text(document: &Html, text: &mut Vec<Content>, img_list: &mut Vec<String>, url_base: &str, error_img: &HashSet<String>) {
+fn get_text(
+    document: &Html,
+    text: &mut Vec<Content>,
+    img_list: &mut Vec<String>,
+    url_base: &str,
+    error_img: &HashSet<String>,
+) {
     let div_selector = Selector::parse("div").unwrap();
 
     for element in document.select(&div_selector) {
@@ -378,8 +391,10 @@ impl Downloader {
         // 图片来源列表
         let mut img_source_list = Vec::new();
 
+        let vol_desc = self.get_vol_desc(volume.url_vol.as_ref().unwrap())?;
+
         let mut url = self.get_start_next_url(volume, volume_no)?;
-        let first_url = url.clone();
+        // let first_url = url.clone();
 
         for i in 0..volume.chapter_list.len() {
             self.message.send(&format!(
@@ -460,19 +475,19 @@ impl Downloader {
 
         //制作epub
         let metadata = MetaData::new(
-             &format!(
+            &format!(
                 "{}-{}",
                 self.book_info.title.clone().unwrap(),
                 volume.title.clone().unwrap()
             ),
             self.book_info.author.as_deref(),
             self.book_info.publisher.as_deref(),
-            self.book_info.description.as_deref(),
+            vol_desc.as_deref(),
             self.book_info.title.as_deref(),
             self.book_info.tags.clone(),
             Some("zh-CN"),
             Some(volume_no),
-            Some(&first_url),
+            Some(&volume.url_vol.as_ref().unwrap().replace(&self.url_base, "")),
         );
         let epub_builder = EpubBuilder::new(
             metadata,
@@ -491,6 +506,27 @@ impl Downloader {
         self.message
             .send(&format!("\n  下载完成，保存到: {}", &path.display()));
         Ok(())
+    }
+
+    fn get_vol_desc(&self, url: &str) -> Result<Option<String>, String> {
+        let url = if !url.starts_with("http") {
+            format!("{}{}", self.url_base, url).as_str().to_string()
+        } else {
+            url.to_string()
+        };
+        let html = &get_html(
+            &url,
+            &self.client,
+            &self.message,
+            0,
+        )?;
+        let document = Html::parse_document(&html);
+        let content_selector = Selector::parse("content").unwrap();
+        for element in document.select(&content_selector) {
+            let description = Some(element.text().collect::<String>());
+            return Ok(description);
+        }
+        Ok(None)
     }
 
     fn get_start_next_url(&self, volume: &VolumeInfo, volume_no: usize) -> Result<String, String> {
@@ -542,9 +578,8 @@ impl Downloader {
         let file_name;
         if self.add_number {
             dir_name = remove_invalid_chars(&format!(
-                "{}[{}]",
+                "{}",
                 self.book_info.title.as_ref().unwrap(),
-                &self.book_id
             ));
             file_name = remove_invalid_chars(&format!(
                 "{}-[{}]{}.epub",
@@ -715,7 +750,13 @@ impl Downloader {
     ) -> Result<String, String> {
         let html = get_html(&url, &self.client, &self.message, self.sleep_time)?;
         let document = Html::parse_document(&html);
-        get_text(&document, chapter_text, img_list, &self.url_base, &self.error_img);
+        get_text(
+            &document,
+            chapter_text,
+            img_list,
+            &self.url_base,
+            &self.error_img,
+        );
 
         if chapter_text.is_empty() {
             self.message.send("   章节内容为空");
@@ -723,10 +764,15 @@ impl Downloader {
         }
 
         // 文本解密
-        if html.contains(r#"read|sheet|family"#) {
+        if html.contains(r#"font-family: "read""#) {
             for content in &mut chapter_text.iter_mut().rev() {
                 if let Content::Text(text) = content {
+                    if text.contains("<br") || text.is_empty() {
+                        continue;
+                    }
                     let new_text = decode_text(&text);
+                    println!("解密前: {}", text);
+                    println!("解密后: {}", new_text);
                     *text = new_text;
                     break;
                 }
