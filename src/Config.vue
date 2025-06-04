@@ -1,177 +1,141 @@
 <template>
-    <div class="config">
-        <div class="form-item">
-            <label>URL</label>
-            <button @click="urlBaseChange" class="btn">{{ urlBase }}</button>
-        </div>
-        <div class="form-item">
-            <label>下载间隔</label>
-            <input type="number" v-model="sleepTime" placeholder="请输入下载间隔" class="input-box" />
-        </div>
-        <div class="form-item">
-            <label>Cookie</label>
-            <input type="text" v-model="cookie" placeholder="请输入cookie" class="input-box" />
-        </div>
-        <div class="form-item">
-            <label>保存路径</label>
-            <input type="text" v-model="outputPath" placeholder="请输入保存路径" class="input-box" />
-        </div>
-        <div class="form-item">
-            <label>命名方式</label>
-            <button class="btn" @click="changeLabel" title="影响命名方式，为true时，会添加[book_id]和[volume_no]到文件名中">{{
-                addNumber ? '添加序号' : '取消序号' }}</button>
-        </div>
-        <div class="form-item">
-            <label>是否添加目录页</label>
-            <button class="btn" @click="changeCatalog">{{
-                addCatalog ? '添加目录页' : '取消目录页' }}</button>
-        </div>
-        <!-- 新增保存配置按钮 -->
-        <div class="form-item">
-            <button @click="saveConfig" class="btn save-btn">保存配置</button>
-        </div>
-    </div>
+  <div class="w-96 p-6 bg-white rounded-2xl shadow-lg mx-auto space-y-5">
+    <n-form :label-width="100" label-placement="left">
+      <!-- URL 设置 -->
+      <n-form-item label="URL">
+        <n-button @click="baseUrlChange" class="w-full text-left truncate">
+          {{ baseUrl }}
+        </n-button>
+      </n-form-item>
+
+      <!-- 下载间隔 -->
+      <n-form-item label="下载间隔">
+        <n-input-number
+          v-model:value="sleepTime"
+          placeholder="请输入下载间隔（秒）"
+          class="w-full"
+        />
+      </n-form-item>
+
+      <!-- Cookie -->
+      <n-form-item label="Cookie">
+        <n-input
+          v-model:value="cookie"
+          placeholder="请输入 Cookie"
+          type="textarea"
+          class="w-full"
+        />
+      </n-form-item>
+
+      <!-- 保存路径 -->
+      <n-form-item label="保存路径">
+        <n-input
+          v-model:value="output"
+          placeholder="请输入保存路径"
+          class="w-full"
+        />
+      </n-form-item>
+
+      <!-- 命名模板 -->
+      <n-form-item label="命名模板">
+        <n-input
+          v-model:value="template"
+          type="text"
+          :title="templateTitle"
+          placeholder="例如：{{title}} - 第{{index}}话"
+          class="w-full"
+        />
+      </n-form-item>
+
+      <!-- 是否添加目录页 -->
+      <n-form-item label="添加目录页">
+        <n-switch v-model:value="addCatalog" />
+      </n-form-item>
+
+      <!-- 保存按钮 -->
+      <n-form-item>
+        <n-button type="primary" class="w-full" @click="saveConfig">
+          保存配置
+        </n-button>
+      </n-form-item>
+    </n-form>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
-import { useToast } from "vue-toastification";
+import { ref, onMounted } from "vue";
+import { useRunCommand } from "./composables/RunCommand";
+import { commands } from "./bindings";
+import { useNotify } from "./composables/useNotification";
+import {
+  NForm,
+  NFormItem,
+  NInput,
+  NInputNumber,
+  NButton,
+  NSwitch
+} from "naive-ui";
 
-const addNumber = ref(false)
-const urlBase = ref<string>("")
-const sleepTime = ref<number>(8)
-const cookie = ref<string>("")
-const outputPath = ref<string>("")
-const addCatalog = ref(false)
-const toast = useToast();
+const runCommand = useRunCommand();
+const notify = useNotify();
 
-const changeLabel = () => {
-    addNumber.value = !addNumber.value
-}
+const template = ref("");
+const baseUrl = ref<string>("https://www.bilinovel.com");
+const sleepTime = ref<number>(8);
+const cookie = ref<string>("");
+const output = ref<string>("");
+const addCatalog = ref(false);
 
-const changeCatalog = () => {
-    addCatalog.value = !addCatalog.value
-}
+const templateTitle = `
+书籍标题使用{{book_title}}，章节标题使用{{chapter_title}}，
+章节编号使用{{chapter_number}}，章节编号前填0使用{{chapter_number:x}}，
+输入 0 ，使用{{book_title}}-{{chapter_title}}，
+输入 1 ，使用{{book_title}}-[{{chapter_number}}]{{chapter_title}}，
+输入 2 ，使用[{{chapter_number}}]{{chapter_title}}，
+输入 3 ，使用[{{chapter_number:2}}]{{chapter_title}}`;
 
-const urlBaseChange = () => {
-    if (urlBase.value === "https://www.bilinovel.com") {
-        urlBase.value = "https://tw.linovelib.com"
-    } else {
-        urlBase.value = "https://www.bilinovel.com"
-    }
-}
+const baseUrlChange = () => {
+  baseUrl.value =
+    baseUrl.value === "https://www.bilinovel.com"
+      ? "https://tw.linovelib.com"
+      : "https://www.bilinovel.com";
+};
 
 const saveConfig = () => {
-    invoke('save_config', {
-        config: {
-            output_path: outputPath.value,
-            add_number: addNumber.value,
-            cookie: cookie.value,
-            sleep_time: sleepTime.value,
-            url_base: urlBase.value,
-        }
-    }).then((res: any) => {
-        console.log("配置已保存", res)
-        toast.success('配置已保存', {
-            timeout: 1000,
-        });
-    }).catch((err: any) => {
-        console.error("保存配置失败", err)
-        toast.error('保存配置失败', {
-            timeout: 1000,
-        });
-    })
-}
+  runCommand({
+    command: commands.saveConfig,
+    args: [
+      {
+        output: output.value,
+        template: template.value,
+        cookie: cookie.value,
+        sleepTime: sleepTime.value,
+        baseUrl: baseUrl.value
+      }
+    ],
+    onSuccess: () => {
+      notify.success({ content: "保存成功" });
+    },
+    errMsg: "保存失败"
+  });
+};
 
 onMounted(() => {
-    invoke('get_config_vue').then((res: any) => {
-        if (res) {
-            urlBase.value = res.url_base
-            sleepTime.value = res.sleep_time
-            cookie.value = res.cookie
-            addNumber.value = res.add_number
-            outputPath.value = res.output_path
-        }
-        if (cookie.value === "") {
-            toast.error('您还没配置cookie，请先配置 Cookie', {
-                timeout: 3000,
-            });
-        }
-    }).catch(() => {
-        console.log("获取配置失败")
-        toast.error('获取配置失败', {
-            timeout: 1000,
-        });
-    })
-})
+  runCommand({
+    command: commands.getConfigVue,
+    onSuccess: (res: any) => {
+      if (res) {
+        template.value = res.template;
+        baseUrl.value = res.baseUrl;
+        sleepTime.value = res.sleepTime;
+        cookie.value = res.cookie;
+        output.value = res.output;
+      }
+      if (cookie.value === "") {
+        notify.error({ content: "您还没配置cookie，请先配置 Cookie" });
+      }
+    },
+    errMsg: "获取配置失败"
+  });
+});
 </script>
-
-<style scoped>
-/* 配置项容器 */
-.config {
-    width: 300px;
-    padding: 20px;
-    background-color: #f9f9f9;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    margin: 20px auto;
-}
-
-/* 表单项样式 */
-.form-item {
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-label {
-    font-weight: bold;
-    font-size: 14px;
-    width: 80px;
-    text-align: left;
-}
-
-/* 输入框样式 */
-.input-box {
-    width: 170px;
-    padding: 8px;
-    font-size: 14px;
-    border-radius: 5px;
-    border: 1px solid #ddd;
-    margin-left: 10px;
-}
-
-/* 按钮样式 */
-.btn {
-    padding: 8px 16px;
-    font-size: 14px;
-    background-color: #ffffff;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-    margin-left: 10px;
-}
-
-.btn:hover {
-    background-color: #f1f1f1;
-}
-
-.save-btn {
-    width: 100%;
-    background-color: #4CAF50;
-    color: white;
-    font-weight: bold;
-}
-
-.save-btn:hover {
-    background-color: #45a049;
-}
-
-.disabled {
-    background-color: #e0e0e0;
-    cursor: not-allowed;
-}
-</style>

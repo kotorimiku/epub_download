@@ -6,29 +6,36 @@ mod tests {
 
     #[test]
     fn it_works() {
-        println!("{}", super::decode_text("朱音那双被泪水沾湿的眼眸绽放出柔和的微笑。"));
-        println!("{}", std::str::from_utf8("扭隅扔帐充就，真泥病低，佛格科办孤。".as_bytes()).unwrap());
+        println!(
+            "{}",
+            super::decode_text("朱音那双被泪水沾湿的眼眸绽放出柔和的微笑。")
+        );
+        println!(
+            "{}",
+            std::str::from_utf8(
+                "扭隅扔帐充就，真泥病低，佛格科办孤。".as_bytes()
+            )
+            .unwrap()
+        );
     }
 }
 
 static SECRET_MAP: OnceLock<HashMap<String, String>> = OnceLock::new();
 
-
 pub fn get_secret_map() -> &'static HashMap<String, String> {
-    SECRET_MAP.get_or_init(|| {get_secret_map_()})
+    SECRET_MAP.get_or_init(|| get_secret_map_())
 }
 
 pub fn decode_text(str: &str) -> String {
-  let mut result = String::new();
-  for char in str.chars() {
-      if let Some(value) = get_secret_map().get(&char.to_string()) {
-        println!("{} -> {}", char, value);
-          result.push_str(value);
-      } else {
-          result.push(char);
-      }
-  }
-  result
+    let mut result = String::new();
+    for char in str.chars() {
+        if let Some(value) = get_secret_map().get(&char.to_string()) {
+            result.push_str(value);
+        } else {
+            result.push(char);
+        }
+    }
+    result
 }
 
 pub fn get_secret_map_() -> HashMap<String, String> {

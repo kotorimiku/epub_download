@@ -1,3 +1,6 @@
 fn main() {
-    tauri_build::build()
+    #[cfg(feature = "gui")]
+    {
+        tauri_build::build();
+    }
 }

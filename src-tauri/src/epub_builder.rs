@@ -3,6 +3,7 @@ use std::fs::create_dir_all;
 use std::path::Path;
 use std::{collections::HashMap, fs::File, io::Write};
 use zip::{write::SimpleFileOptions, CompressionMethod};
+use anyhow::{anyhow, Result};
 
 #[derive(Default, Debug)]
 pub struct MetaData {
@@ -125,7 +126,7 @@ impl EpubBuilder {
         epub
     }
 
-    pub fn save_file(&self, path: &Path) -> Result<(), String> {
+    pub fn save_file(&self, path: &Path) -> Result<()> {
         self.create_dir(path.parent())?;
         let mut file_map = self.build_epub();
 
@@ -148,10 +149,10 @@ impl EpubBuilder {
         Ok(())
     }
 
-    fn create_dir(&self, dir: Option<&Path>) -> Result<(), String> {
+    fn create_dir(&self, dir: Option<&Path>) -> Result<()> {
         if let Some(dir) = dir {
             if let Err(_) = create_dir_all(dir) {
-                return Err(String::from("创建目录失败"));
+                return Err(anyhow!("创建目录失败"));
             }
         }
         Ok(())
