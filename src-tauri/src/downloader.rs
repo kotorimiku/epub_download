@@ -1,5 +1,5 @@
 use crate::client::*;
-use crate::epub_builder::{EpubBuilder, MetaData};
+use crate::epub_builder::{Body, ContentBlock, EpubBuilder, Metadata};
 use crate::model::{BookInfo, Content, Message, VolumeInfo};
 use crate::parse::{parse_metadata, parse_novel_text, parse_vol_desc, parse_volume_list};
 use crate::secret::decode_text;
@@ -27,7 +27,7 @@ pub struct Downloader {
     pub book_id: String,
     pub client: BiliClient,
     pub book_info: BookInfo,
-    pub volume_list: Vec<VolumeInfo>,
+    pub volume_infos: Vec<VolumeInfo>,
     pub output: String,
     pub template: String,
     pub message: Message,
@@ -67,14 +67,14 @@ impl Downloader {
         if book_info.title.is_none() {
             return Err(anyhow!("Book not found"));
         }
-        let volume_list = get_volume_list(book_id.as_str(), &client, &message)?;
+        let volume_infos = get_volume_list(book_id.as_str(), &client, &message)?;
         error_img.extend(ERROR_IMG.iter().map(|s| s.to_string()));
         Ok(Self {
             base_url,
             book_id,
             client,
             book_info,
-            volume_list,
+            volume_infos,
             output,
             template,
             message,
@@ -89,7 +89,7 @@ impl Downloader {
         book_id: String,
         output: String,
         book_info: BookInfo,
-        volume_list: Vec<VolumeInfo>,
+        volume_infos: Vec<VolumeInfo>,
         template: String,
         message: Message,
         sleep_time: u32,
@@ -104,7 +104,7 @@ impl Downloader {
             book_id,
             client,
             book_info,
-            volume_list,
+            volume_infos,
             output,
             template,
             message,
@@ -126,7 +126,7 @@ impl Downloader {
         ));
         io::stdout().flush().unwrap();
         for no in volume_no {
-            if let Some(volume) = self.volume_list.get(no as usize - 1) {
+            if let Some(volume) = self.volume_infos.get(no as usize - 1) {
                 self.download_single(&mut volume.clone(), no as usize)?;
             }
         }
@@ -145,13 +145,13 @@ impl Downloader {
             volume.title.as_ref().unwrap()
         ));
         // 章节内容
-        let mut text = Vec::new();
+        let mut chapters_raw = Vec::new();
         // 章节html
-        let mut text_html = Vec::new();
+        let mut chapters = Vec::new();
         // 图片url列表
-        let mut img_url_list = Vec::new();
+        let mut image_urls = Vec::new();
         // 图片扩展名列表
-        let mut ext_list = Vec::new();
+        let mut image_exts = Vec::new();
         // 图片来源列表
         let mut img_source_list = Vec::new();
 
@@ -167,11 +167,11 @@ impl Downloader {
                 volume.chapter_list[i]
             ));
             let mut chapter_text = Vec::new();
-            let next_url = self.get_chapter_text(&url, &mut chapter_text, &mut img_url_list)?;
-            for _ in img_source_list.len()..img_url_list.len() {
+            let next_url = self.get_chapter_text(&url, &mut chapter_text, &mut image_urls)?;
+            for _ in img_source_list.len()..image_urls.len() {
                 img_source_list.push(url.clone());
             }
-            text.push(chapter_text);
+            chapters_raw.push(chapter_text);
             url = next_url;
         }
 
@@ -184,15 +184,15 @@ impl Downloader {
             };
             let ext = self.get_ext(&url);
 
-            img_url_list.insert(0, url);
+            image_urls.insert(0, url);
             img_source_list.insert(0, self.base_url.clone());
-            ext_list.insert(0, String::from(".") + &ext);
+            image_exts.insert(0, ext);
         };
 
         if volume.chapter_list[0] == "插图" {
             volume.chapter_list[0] = "彩页".to_string();
             // 分离彩页
-            let color_page = text.remove(0);
+            let color_page = chapters_raw.remove(0);
             let (info, mut images): (Vec<_>, Vec<_>) = color_page
                 .into_iter()
                 .partition(|content| matches!(content, Content::Text(_)));
@@ -204,8 +204,8 @@ impl Downloader {
                 add_cover();
             } else {
                 images.remove(0);
-                ext_list.push(String::from(".") + &self.get_ext(&img_url_list[0]));
-                text.insert(0, images);
+                image_exts.push(self.get_ext(&image_urls[0]));
+                chapters_raw.insert(0, images);
             }
             // 添加信息页
             let filter = info
@@ -213,7 +213,7 @@ impl Downloader {
                 .filter(|content| !matches!(content, Content::Text(ref s) if s == ""))
                 .collect::<Vec<_>>();
             if filter.len() > 0 {
-                text.insert(0, info);
+                chapters_raw.insert(0, info);
                 volume.chapter_list.insert(0, "信息".to_string());
             }
         } else {
@@ -221,41 +221,44 @@ impl Downloader {
             add_cover();
         }
 
-        self.to_html(
-            &mut text,
-            &mut img_url_list,
-            &mut text_html,
-            &mut ext_list,
+        self.get_chapters(
+            &mut chapters_raw,
+            &mut image_urls,
+            &mut chapters,
+            &mut image_exts,
             &mut img_source_list,
         );
 
         // 移除空章节
         let mut remove_list = Vec::new();
-        for i in 0..text_html.len() {
-            if text_html[i].split("<br/>").all(|s| s.is_empty()) {
+        for i in 0..chapters.len() {
+            if chapters[i]
+                .iter()
+                .all(|cb| matches!(cb, ContentBlock::Text(s) if s.is_empty()))
+            {
                 remove_list.push(i);
             }
         }
         for i in remove_list.iter().rev() {
-            text_html.remove(*i);
+            chapters.remove(*i);
             volume.chapter_list.remove(*i);
         }
 
-        if img_url_list.len() != ext_list.len() {
+        if image_urls.len() != image_exts.len() {
             self.message.send("图片数量与扩展名数量不匹配");
             self.message
-                .send(&format!("图片数量: {}", img_url_list.len()));
+                .send(&format!("图片数量: {}", image_urls.len()));
             self.message
-                .send(&format!("扩展名数量: {}", ext_list.len()));
-            self.message.send(&format!("{:?}", img_url_list));
+                .send(&format!("扩展名数量: {}", image_exts.len()));
+            self.message.send(&format!("{:?}", image_urls));
             Err(anyhow!("图片数量与扩展名数量不匹配"))?;
         }
 
         //下载插图
-        let img_data_list = self.download_img_list(&img_url_list, &img_source_list)?;
+        let img_data_list = self.download_img_list(&image_urls, &img_source_list)?;
 
         //制作epub
-        let metadata = MetaData::new(
+        let metadata = Metadata::new(
             &format!(
                 "{}-{}",
                 self.book_info.title.clone().unwrap(),
@@ -272,10 +275,11 @@ impl Downloader {
         );
         let epub_builder = EpubBuilder::new(
             metadata,
-            text_html,
+            Body::Blocks(chapters),
             volume.chapter_list.clone(),
             img_data_list,
-            ext_list,
+            image_exts,
+            image_urls,
             self.add_catalog,
         );
 
@@ -304,7 +308,7 @@ impl Downloader {
     fn get_start_next_url(&self, volume: &VolumeInfo, volume_no: usize) -> Result<String> {
         let mut next_url = self.base_url.clone() + &volume.chapter_path_list[0].clone();
         if next_url.contains("javascript") {
-            let pre_volume = &self.volume_list[volume_no - 2];
+            let pre_volume = &self.volume_infos[volume_no - 2];
             let pre_url_path = pre_volume.chapter_path_list.last().unwrap();
             let url = self.base_url.clone() + pre_url_path;
             next_url = self.get_next_chapter_url(&self.client.get_html(
@@ -434,7 +438,7 @@ impl Downloader {
     }
 
     fn get_ext(&self, url: &str) -> String {
-        let suffixes = vec![".jpg", ".png", ".jpeg"];
+        let suffixes = vec!["jpg", "png", "jpeg"];
         if suffixes.iter().any(|&suffix| url.ends_with(suffix)) {
             return path::Path::new(&url)
                 .extension()
@@ -445,60 +449,41 @@ impl Downloader {
         return String::from("jpg");
     }
 
-    fn to_html(
+    fn get_chapters(
         &self,
-        text: &mut Vec<Vec<Content>>,
-        img_url_list: &mut Vec<String>,
-        text_html: &mut Vec<String>,
-        ext_list: &mut Vec<String>,
-        img_source_list: &mut Vec<String>,
+        chapters_raw: &mut Vec<Vec<Content>>,
+        image_urls: &mut Vec<String>,
+        chapters: &mut Vec<Vec<ContentBlock>>,
+        image_exts: &mut Vec<String>,
+        image_sources: &mut Vec<String>,
     ) {
-        for chapter in text {
+        for chapter_raw in chapters_raw {
+            let mut chapter = Vec::new();
             let mut remove_list = Vec::new();
-            for i in 0..chapter.len() {
-                match &chapter[i] {
+            for i in 0..chapter_raw.len() {
+                match &chapter_raw[i] {
                     Content::Image(url) => {
-                        let count = img_url_list.iter().filter(|&x| x == url).count();
-                        let index = img_url_list.iter().position(|x| x == url).unwrap();
+                        let count = image_urls.iter().filter(|&x| x == url).count();
+                        let index = image_urls.iter().position(|x| x == url).unwrap();
                         if count > 1 {
-                            img_url_list.remove(index);
-                            img_source_list.remove(index);
+                            image_urls.remove(index);
+                            image_sources.remove(index);
                             remove_list.push(i);
                         } else {
+                            chapter.push(ContentBlock::Image(index));
                             let ext = self.get_ext(&url);
 
                             if url.starts_with("//") {
-                                img_url_list[index] = format!("https:{}", url);
+                                image_urls[index] = format!("https:{}", url);
                             }
-
-                            chapter[i] = Content::Image(format!(
-                                "<img src=\"../Images/{}.{}\" alt=\"{}\" />",
-                                format!("{:0>3}", index),
-                                &ext,
-                                url
-                            ));
-                            ext_list.push(String::from(".") + &ext);
+                            image_exts.push(ext);
                         }
                     }
-                    Content::Text(_) => {}
+                    Content::Text(text) => chapter.push(ContentBlock::Text(text.to_owned())),
                 }
             }
-            for i in remove_list.iter().rev() {
-                chapter.remove(*i);
-            }
-            text_html.push(self.to_chapter_html(&*chapter));
+            chapters.push(chapter);
         }
-    }
-
-    fn to_chapter_html(&self, chapter_text: &Vec<Content>) -> String {
-        return chapter_text
-            .iter() // 遍历 Vec<Content> 的每个元素
-            .map(|content| match content {
-                Content::Text(s) => s.clone(),
-                Content::Image(s) => s.clone(),
-            })
-            .collect::<Vec<String>>()
-            .join("\n    ");
     }
 
     fn get_chapter_text(

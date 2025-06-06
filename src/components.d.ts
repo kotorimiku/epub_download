@@ -8,10 +8,12 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    Config: typeof import('./views/Config.vue')['default']
     NButton: typeof import('naive-ui')['NButton']
     NCard: typeof import('naive-ui')['NCard']
     NCheckbox: typeof import('naive-ui')['NCheckbox']
     NInput: typeof import('naive-ui')['NInput']
     NNotificationProvider: typeof import('naive-ui')['NNotificationProvider']
+    Search: typeof import('./views/Search.vue')['default']
   }
 }

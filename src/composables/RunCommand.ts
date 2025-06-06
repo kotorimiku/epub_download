@@ -3,24 +3,21 @@ import { useNotify } from "./useNotification";
 
 export function useRunCommand() {
   const notify = useNotify();
-  async function runCommand<T, A extends any[]>(params: {
-    command: (...args: A) => Promise<Result<T, CommandError>>,
+  async function runCommand<T>(params: {
+    command: () => Promise<Result<T, CommandError>>,
     onSuccess?: (data: T) => void,
-    args?: A,
     errMsg?: string,
     onError?: (err: CommandError) => void
   }) {
     const {
       command,
       onSuccess,
-      args,
       errMsg = "请求失败",
       onError
     } = params;
 
     try {
-      const actualArgs = (args ?? []) as A;
-      const res = await command(...actualArgs);
+      const res = await command();
       if (res.status === "ok") {
         onSuccess?.(res.data);
       } else {

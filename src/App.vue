@@ -28,8 +28,6 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import Search from "./Search.vue";
-import Config from "./Config.vue";
 
 const currentPage = ref<"search" | "config">("search");
 

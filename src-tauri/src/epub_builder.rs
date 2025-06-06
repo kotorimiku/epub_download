@@ -1,12 +1,12 @@
+use anyhow::{anyhow, Result};
 use chrono::Utc;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::{collections::HashMap, fs::File, io::Write};
 use zip::{write::SimpleFileOptions, CompressionMethod};
-use anyhow::{anyhow, Result};
 
 #[derive(Default, Debug)]
-pub struct MetaData {
+pub struct Metadata {
     pub title: String,
     pub creator: Option<String>,
     pub publisher: Option<String>,
@@ -18,7 +18,7 @@ pub struct MetaData {
     pub identifier: Option<String>,
 }
 
-impl MetaData {
+impl Metadata {
     pub fn new(
         title: &str,
         creator: Option<&str>,
@@ -30,13 +30,13 @@ impl MetaData {
         index: Option<usize>,
         identifier: Option<&str>,
     ) -> Self {
-        let title = escape_epub_text(title);
-        let creator = creator.map(|c| escape_epub_text(c));
-        let publisher = publisher.map(|p| escape_epub_text(p));
-        let description = description.map(|d| escape_epub_text(d));
-        let series = series.map(|s| escape_epub_text(s));
-        let language = language.map(|l| escape_epub_text(l));
-        let identifier = identifier.map(|i| escape_epub_text(i));
+        let title = remove_invalid_xml_chars(&escape_epub_text(title));
+        let creator = creator.map(|c| remove_invalid_xml_chars(&escape_epub_text(c)));
+        let publisher = publisher.map(|p| remove_invalid_xml_chars(&escape_epub_text(p)));
+        let description = description.map(|d| remove_invalid_xml_chars(&escape_epub_text(d)));
+        let series = series.map(|s| remove_invalid_xml_chars(&escape_epub_text(s)));
+        let language = language.map(|l| remove_invalid_xml_chars(&escape_epub_text(l)));
+        let identifier = identifier.map(|i| remove_invalid_xml_chars(&escape_epub_text(i)));
         Self {
             title,
             creator,
@@ -47,33 +47,74 @@ impl MetaData {
             language,
             index,
             identifier,
-        }}
+        }
+    }
+}
+
+pub enum Body {
+    Html(Vec<String>),
+    Blocks(Vec<Vec<ContentBlock>>),
+}
+
+pub enum ContentBlock {
+    Text(String),
+    Image(usize),
 }
 
 pub struct EpubBuilder {
-    metadata: MetaData,
-    text: Vec<String>,
-    chapter_list: Vec<String>,
-    img_data_list: Vec<Vec<u8>>,
-    ext_list: Vec<String>,
+    metadata: Metadata,
+    chapters: Body,
+    chapter_titles: Vec<String>,
+    images: Vec<Vec<u8>>,
+    image_exts: Vec<String>,
+    image_alts: Vec<String>,
     add_catalog: bool,
 }
 
 impl EpubBuilder {
     pub fn new(
-        metadata: MetaData,
-        text: Vec<String>,
-        chapter_list: Vec<String>,
-        img_data_list: Vec<Vec<u8>>,
-        ext_list: Vec<String>,
+        metadata: Metadata,
+        chapters: Body,
+        chapter_titles: Vec<String>,
+        images: Vec<Vec<u8>>,
+        image_exts: Vec<String>,
+        image_alts: Vec<String>,
         add_catalog: bool,
     ) -> Self {
+        let chapters = match chapters {
+            Body::Blocks(blocks) => Body::Blocks(
+                blocks
+                    .into_iter()
+                    .map(|chapter| {
+                        chapter
+                            .into_iter()
+                            .map(|block| match block {
+                                ContentBlock::Text(text) => ContentBlock::Text(
+                                    remove_invalid_xml_chars(&escape_epub_text(&text)),
+                                ),
+                                ContentBlock::Image(_) => block,
+                            })
+                            .collect()
+                    })
+                    .collect(),
+            ),
+            Body::Html(html) => Body::Html(
+                html.into_iter()
+                    .map(|t| remove_invalid_xml_chars(&t))
+                    .collect(),
+            ),
+        };
+        let chapter_titles = chapter_titles
+            .into_iter()
+            .map(|t| remove_invalid_xml_chars(&escape_epub_text(&t)))
+            .collect();
         EpubBuilder {
             metadata,
-            text,
-            chapter_list,
-            img_data_list,
-            ext_list,
+            chapters,
+            chapter_titles,
+            images,
+            image_exts,
+            image_alts,
             add_catalog,
         }
     }
@@ -101,10 +142,14 @@ impl EpubBuilder {
             String::from("OEBPS/Text/cover.xhtml"),
             self.build_cover_xhtml().as_bytes().to_vec(),
         );
-        for i in 0..self.text.len() {
+        let html = match &self.chapters {
+            Body::Html(html) => html,
+            Body::Blocks(blocks) => &self.to_html(&blocks),
+        };
+        for i in 0..html.len() {
             epub.insert(
                 format!("OEBPS/Text/{}.xhtml", self.num_fill(i + 1)),
-                self.build_xhtml(&self.chapter_list[i], &self.text[i])
+                self.build_xhtml(&self.chapter_titles[i], &html[i])
                     .as_bytes()
                     .to_vec(),
             );
@@ -113,17 +158,44 @@ impl EpubBuilder {
             String::from("OEBPS/Text/nav.xhtml"),
             self.build_nav_xhtml().as_bytes().to_vec(),
         );
-        for i in 0..self.ext_list.len() {
-            let ext = self.ext_list[i].split(".").last().unwrap();
+        for i in 0..self.image_exts.len() {
+            let ext = &self.image_exts[i];
             epub.insert(
                 format!("OEBPS/Images/{}.{}", self.num_fill(i), ext),
-                self.img_data_list[i].clone(),
+                self.images[i].clone(),
             );
         }
         if self.add_catalog {
             add_file(&mut epub, self.build_sgc_nav_css());
         }
         epub
+    }
+
+    fn to_html(&self, chapters: &Vec<Vec<ContentBlock>>) -> Vec<String> {
+        chapters
+            .into_iter()
+            .map(|chapter| {
+                chapter
+                    .iter()
+                    .map(|block| match block {
+                        ContentBlock::Text(text) => {
+                            if text.is_empty() {
+                                String::from("<br/>")
+                            } else {
+                                format!("<p>{}</p>", text)
+                            }
+                        }
+                        ContentBlock::Image(image) => format!(
+                            "<img src=\"../Images/{}.{}\" alt=\"{}\" />",
+                            self.num_fill(*image),
+                            self.image_exts[*image],
+                            self.image_alts[*image]
+                        ),
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n    ")
+            })
+            .collect()
     }
 
     pub fn save_file(&self, path: &Path) -> Result<()> {
@@ -183,7 +255,7 @@ impl EpubBuilder {
 
     fn get_nav_xml(&self) -> String {
         let mut nav_map = Vec::new();
-        for i in 0..self.chapter_list.len() {
+        for i in 0..self.chapter_titles.len() {
             nav_map.push(format!(
                 r#"<navPoint id="navPoint-{}" playOrder="{}">
       <navLabel>
@@ -193,7 +265,7 @@ impl EpubBuilder {
     </navPoint>"#,
                 i + 1,
                 i + 1,
-                self.chapter_list[i],
+                self.chapter_titles[i],
                 format!("Text/{}.xhtml", self.num_fill(i + 1)),
             ));
         }
@@ -236,7 +308,7 @@ impl EpubBuilder {
         spine.push(format!("<itemref idref=\"cover.xhtml\"/>"));
         // 添加目录页
         // spine.push(format!("<itemref idref=\"nav.xhtml\"/>"));
-        for i in 0..self.chapter_list.len() {
+        for i in 0..self.chapter_titles.len() {
             spine.push(format!(
                 "<itemref idref=\"x{}.xhtml\"/>",
                 self.num_fill(i + 1)
@@ -253,17 +325,16 @@ impl EpubBuilder {
         ));
 
         // text
-        for i in 0..self.chapter_list.len() {
+        for i in 0..self.chapter_titles.len() {
             manifest.push(format!("<item id=\"x{}.xhtml\" href=\"Text/{}.xhtml\" media-type=\"application/xhtml+xml\"/>", self.num_fill(i + 1), self.num_fill(i + 1)));
         }
 
         // image
-        for i in 0..self.img_data_list.len() {
-            let ext = self.ext_list[i].split('.').last().unwrap();
+        for i in 0..self.images.len() {
+            let ext = &self.image_exts[i];
             let media_type = if ext == "png" {
                 "image/png"
-            }
-            else {
+            } else {
                 "image/jpeg"
             };
 
@@ -322,7 +393,7 @@ impl EpubBuilder {
 
         metadata.push(format!(
             "<meta name=\"cover\" content=\"x000.{}\"/>",
-            self.ext_list[0].trim_start_matches('.')
+            self.image_exts[0]
         ));
         if let Some(series) = &self.metadata.series {
             metadata.push(format!(
@@ -388,11 +459,11 @@ impl EpubBuilder {
 </head>
 <body>
   <div style="text-align: center; padding: 0pt; margin: 0pt;">
-    <img src="../Images/000{}" alt="cover" />
+    <img src="../Images/000.{}" alt="cover" />
   </div>
 </body>
 </html>"#,
-            self.ext_list[0]
+            self.image_exts[0]
         )
     }
 
@@ -407,11 +478,11 @@ impl EpubBuilder {
         };
         let mut nav_map = Vec::new();
 
-        for i in 0..self.chapter_list.len() {
+        for i in 0..self.chapter_titles.len() {
             nav_map.push(format!(
                 "<li><a href=\"{}.xhtml\">{}</a></li>",
                 self.num_fill(i + 1),
-                self.chapter_list[i]
+                self.chapter_titles[i]
             ));
         }
 
@@ -507,4 +578,17 @@ pub fn escape_epub_text(input: &str) -> String {
         .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
+}
+
+fn remove_invalid_xml_chars(input: &str) -> String {
+    input
+        .chars()
+        .filter(|&c| match c as u32 {
+            0x9 | 0xA | 0xD => true,
+            0x20..=0xD7FF => true,
+            0xE000..=0xFFFD => true,
+            0x10000..=0x10FFFF => true,
+            _ => false,
+        })
+        .collect()
 }

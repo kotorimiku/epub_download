@@ -45,8 +45,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { listen } from "@tauri-apps/api/event"; // 监听事件
-import { useRunCommand } from "./composables/RunCommand";
-import { commands } from "./bindings";
+import { useRunCommand } from "../composables/RunCommand";
+import { commands } from "../bindings";
 
 const runCommand = useRunCommand();
 
@@ -143,8 +143,7 @@ const search = async () => {
   }
 
   runCommand({
-    command: commands.getBookInfo,
-    args: [bookId.value.trim()],
+    command: () => commands.getBookInfo(bookId.value.trim()),
     onSuccess: (result: any) => {
       bookInfo.value = result[0];
       volumeList.value = result[1];
@@ -169,13 +168,13 @@ const download = async () => {
   isDownloading.value = true;
 
   runCommand({
-    command: commands.download,
-    args: [
-      bookId.value.trim(),
-      bookInfo.value,
-      volumeList.value,
-      selectedVolumes.value,
-    ],
+    command: () =>
+      commands.download(
+        bookId.value.trim(),
+        bookInfo.value,
+        volumeList.value,
+        selectedVolumes.value
+      ),
     onSuccess: () => {
       messages.value.push(`下载任务完成！`);
       scrollToBottom();

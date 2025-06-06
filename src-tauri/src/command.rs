@@ -38,7 +38,7 @@ pub async fn get_book_info(
             add_catalog,
             error_img,
         )?;
-        Ok::<_, anyhow::Error>((result.book_info, result.volume_list))
+        Ok::<_, anyhow::Error>((result.book_info, result.volume_infos))
     });
 
     let result = handle.await??;

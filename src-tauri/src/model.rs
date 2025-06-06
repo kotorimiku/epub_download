@@ -24,7 +24,6 @@ pub struct VolumeInfo {
     pub cover: Option<String>,
 }
 
-#[derive(Debug)]
 pub enum Content {
     Text(String),
     Image(String),

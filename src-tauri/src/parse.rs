@@ -2,10 +2,7 @@ use std::collections::HashMap;
 
 use scraper::{Html, Selector};
 
-use crate::{
-    model::{BookInfo, Content, VolumeInfo},
-    utils::escape_epub_text,
-};
+use crate::model::{BookInfo, Content, VolumeInfo};
 
 pub fn parse_metadata(html: &str) -> BookInfo {
     let document = Html::parse_document(html);
@@ -162,16 +159,11 @@ pub fn parse_novel_text(
                         continue;
                     } else {
                         let t: String = child.text().collect::<String>().trim().to_string();
-                        let html = child.html();
                         if !t.contains("function")
                             && !t.contains("Note: 请不要")
                             && !t.contains("= window.")
                         {
-                            if t.is_empty() {
-                                text.push(Content::Text("<br/>".to_string()));
-                            } else {
-                                text.push(Content::Text(html.replace(&t, &escape_epub_text(&t))));
-                            }
+                            text.push(Content::Text(t));
                         }
                     }
                 }

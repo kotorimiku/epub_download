@@ -64,16 +64,16 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { useRunCommand } from "./composables/RunCommand";
-import { commands } from "./bindings";
-import { useNotify } from "./composables/useNotification";
+import { useRunCommand } from "../composables/RunCommand";
+import { commands } from "../bindings";
+import { useNotify } from "../composables/useNotification";
 import {
   NForm,
   NFormItem,
   NInput,
   NInputNumber,
   NButton,
-  NSwitch
+  NSwitch,
 } from "naive-ui";
 
 const runCommand = useRunCommand();
@@ -103,20 +103,18 @@ const baseUrlChange = () => {
 
 const saveConfig = () => {
   runCommand({
-    command: commands.saveConfig,
-    args: [
-      {
+    command: () =>
+      commands.saveConfig({
         output: output.value,
         template: template.value,
         cookie: cookie.value,
         sleepTime: sleepTime.value,
-        baseUrl: baseUrl.value
-      }
-    ],
+        baseUrl: baseUrl.value,
+      }),
     onSuccess: () => {
       notify.success({ content: "保存成功" });
     },
-    errMsg: "保存失败"
+    errMsg: "保存失败",
   });
 };
 
@@ -135,7 +133,7 @@ onMounted(() => {
         notify.error({ content: "您还没配置cookie，请先配置 Cookie" });
       }
     },
-    errMsg: "获取配置失败"
+    errMsg: "获取配置失败",
   });
 });
 </script>

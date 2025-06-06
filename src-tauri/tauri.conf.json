@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "epub_download",
-        "width": 660,
-        "height": 500
+        "width": 750,
+        "height": 600
       }
     ],
     "security": {
