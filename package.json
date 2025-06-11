@@ -12,10 +12,12 @@
   "dependencies": {
     "@tauri-apps/api": "^2.5.0",
     "@tauri-apps/plugin-opener": "^2.2.7",
+    "@viselect/vue": "^3.9.0",
     "vue": "^3.5.16"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.5.0",
+    "@vicons/fluent": "^0.13.0",
     "@vitejs/plugin-vue": "^5.2.4",
     "naive-ui": "^2.41.0",
     "typescript": "~5.6.3",

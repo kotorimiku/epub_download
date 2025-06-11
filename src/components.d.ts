@@ -12,8 +12,11 @@ declare module 'vue' {
     NButton: typeof import('naive-ui')['NButton']
     NCard: typeof import('naive-ui')['NCard']
     NCheckbox: typeof import('naive-ui')['NCheckbox']
+    NConfigProvider: typeof import('naive-ui')['NConfigProvider']
+    NIcon: typeof import('naive-ui')['NIcon']
     NInput: typeof import('naive-ui')['NInput']
     NNotificationProvider: typeof import('naive-ui')['NNotificationProvider']
+    NTooltip: typeof import('naive-ui')['NTooltip']
     Search: typeof import('./views/Search.vue')['default']
   }
 }

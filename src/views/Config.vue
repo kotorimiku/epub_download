@@ -1,11 +1,9 @@
 <template>
-  <div class="w-96 p-6 bg-white rounded-2xl shadow-lg mx-auto space-y-5">
-    <n-form :label-width="100" label-placement="left">
+  <div class="w-96 p-6 rounded-2 shadow-lg mx-auto mt-5">
+    <n-form label-width="85" label-placement="left">
       <!-- URL 设置 -->
       <n-form-item label="URL">
-        <n-button @click="baseUrlChange" class="w-full text-left truncate">
-          {{ baseUrl }}
-        </n-button>
+        <n-input v-model:value="baseUrl" class="w-full" />
       </n-form-item>
 
       <!-- 下载间隔 -->
@@ -41,10 +39,25 @@
         <n-input
           v-model:value="template"
           type="text"
-          :title="templateTitle"
           placeholder="例如：{{title}} - 第{{index}}话"
           class="w-full"
-        />
+        >
+          <template #suffix>
+            <n-tooltip trigger="hover">
+              <template #trigger>
+                <n-icon size="20" color="black" class="cursor-help">
+                  <QuestionCircle24Regular />
+                </n-icon>
+              </template>
+              <p
+                v-for="(line, index) in templateTitle.split('\n')"
+                :key="index"
+              >
+                {{ line }}
+              </p>
+            </n-tooltip>
+          </template>
+        </n-input>
       </n-form-item>
 
       <!-- 是否添加目录页 -->
@@ -67,6 +80,7 @@ import { ref, onMounted } from "vue";
 import { useRunCommand } from "../composables/RunCommand";
 import { commands } from "../bindings";
 import { useNotify } from "../composables/useNotification";
+import QuestionCircle24Regular from "@vicons/fluent/QuestionCircle24Regular";
 import {
   NForm,
   NFormItem,
@@ -87,19 +101,16 @@ const output = ref<string>("");
 const addCatalog = ref(false);
 
 const templateTitle = `
-书籍标题使用{{book_title}}，章节标题使用{{chapter_title}}，
-章节编号使用{{chapter_number}}，章节编号前填0使用{{chapter_number:x}}，
-输入 0 ，使用{{book_title}}-{{chapter_title}}，
-输入 1 ，使用{{book_title}}-[{{chapter_number}}]{{chapter_title}}，
-输入 2 ，使用[{{chapter_number}}]{{chapter_title}}，
-输入 3 ，使用[{{chapter_number:2}}]{{chapter_title}}`;
+书籍标题：{{book_title}}
+章节标题：{{chapter_title}}
+章节编号：{{chapter_number}}
+章节编号前补零：{{chapter_number:x}}
 
-const baseUrlChange = () => {
-  baseUrl.value =
-    baseUrl.value === "https://www.bilinovel.com"
-      ? "https://tw.linovelib.com"
-      : "https://www.bilinovel.com";
-};
+输入 0：{{book_title}}-{{chapter_title}}
+输入 1：{{book_title}}-[{{chapter_number}}]{{chapter_title}}
+输入 2：[{{chapter_number}}]{{chapter_title}}
+输入 3：[{{chapter_number:2}}]{{chapter_title}}
+`;
 
 const saveConfig = () => {
   runCommand({

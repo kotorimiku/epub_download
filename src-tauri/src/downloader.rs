@@ -12,16 +12,6 @@ use std::path::PathBuf;
 use std::path::{self, absolute};
 use std::thread::sleep;
 
-const ERROR_IMG: [&str; 7] = [
-    "https://www.xlcx996.xyz/image/novel/sister01.jpg", // 3273/167199.html
-    "「<img",                                           // 1744/180492.html
-    "https://img3.readpai.com/3/3275/241359/263728.jpg", // 3275/241359.html
-    "https://cdn-img.beixibaobao.cn/images/2vp7.png",   // 3305/168116_2.html
-    "https://s6.jpg.cm/2022/07/12/Pn4pQS.jpg",          // 3342/169533_2.html
-    "https://img1.imgtp.com/2022/07/26/S3ooRdwC.png",   // 3342/169525.html
-    "https://img1.imgtp.com/2022/07/27/3kRju45s.png",   // 3342/169587_3.html
-];
-
 pub struct Downloader {
     pub base_url: String,
     pub book_id: String,
@@ -60,7 +50,7 @@ impl Downloader {
         sleep_time: u32,
         cookie: &str,
         add_catalog: bool,
-        mut error_img: HashSet<String>,
+        error_img: HashSet<String>,
     ) -> Result<Self> {
         let client = BiliClient::new(&base_url, cookie);
         let book_info = get_metadata(&book_id, &client, &message)?;
@@ -68,7 +58,6 @@ impl Downloader {
             return Err(anyhow!("Book not found"));
         }
         let volume_infos = get_volume_list(book_id.as_str(), &client, &message)?;
-        error_img.extend(ERROR_IMG.iter().map(|s| s.to_string()));
         Ok(Self {
             base_url,
             book_id,
@@ -95,10 +84,9 @@ impl Downloader {
         sleep_time: u32,
         cookie: &str,
         add_catalog: bool,
-        mut error_img: HashSet<String>,
+        error_img: HashSet<String>,
     ) -> Self {
         let client = BiliClient::new(&base_url, cookie);
-        error_img.extend(ERROR_IMG.iter().map(|s| s.to_string()));
         Self {
             base_url,
             book_id,
