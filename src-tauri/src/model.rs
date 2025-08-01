@@ -24,9 +24,20 @@ pub struct VolumeInfo {
     pub cover: Option<String>,
 }
 
+#[derive(Debug, Clone)]
 pub enum Content {
     Text(String),
     Image(String),
+}
+
+impl Content {
+    pub fn is_text(&self) -> bool {
+        matches!(self, Content::Text(_))
+    }
+
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Content::Text(text) if text.is_empty())
+    }
 }
 
 #[cfg(feature = "gui")]

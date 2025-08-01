@@ -107,3 +107,14 @@ pub async fn get_config_vue(config: State<'_, RwLock<Config>>) -> Result<Config>
     let config = config.read();
     Ok(config.clone())
 }
+
+#[tauri::command]
+#[specta::specta]
+pub async fn check_update() -> Result<String> {
+    let handle = tokio::task::spawn_blocking(move || {
+        let client = crate::client::BiliClient::new("https://www.bilinovel.com", "");
+        client.check_update()
+    });
+    let result = handle.await??;
+    Ok(result)
+}

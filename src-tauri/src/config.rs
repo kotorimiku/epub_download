@@ -22,6 +22,8 @@ pub struct Config {
     pub add_catalog: bool,
     #[serde(default = "default_error_img")]
     pub error_img: HashSet<String>,
+    #[serde(default = "default_auto_check_update")]
+    pub auto_check_update: bool,
 }
 
 impl Config {
@@ -34,6 +36,7 @@ impl Config {
             base_url: String::from("https://www.bilinovel.com"),
             add_catalog: false,
             error_img: HashSet::new(),
+            auto_check_update: true,
         }
     }
 
@@ -88,4 +91,8 @@ fn default_error_img() -> HashSet<String> {
         "https://img1.imgtp.com/2022/07/27/3kRju45s.png",   // 3342/169587_3.html
     ];
     ERROR_IMG.iter().map(|s| s.to_string()).collect()
+}
+
+fn default_auto_check_update() -> bool {
+    true
 }

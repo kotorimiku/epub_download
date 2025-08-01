@@ -1,8 +1,8 @@
 [package]
 name = "epub_download"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "1.4.2"
+description = "bilinovel downloader"
+authors = ["kotorimiku"]
 edition = "2021"
 default-run = "epub_download"
 
@@ -43,6 +43,7 @@ image = "0.25.5"
 clap = { version = "4.5.23", features = ["derive"] }
 anyhow = "1.0.98"
 parking_lot = "0.12.4"
+semver = "1.0.26"
 
 [profile.release]
 strip = true

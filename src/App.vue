@@ -1,6 +1,8 @@
 <template>
   <n-config-provider>
     <n-notification-provider>
+      <AutoCheckUpdate />
+
       <div class="p-2">
         <!-- 页面切换按钮区域 -->
         <div class="flex gap-2">

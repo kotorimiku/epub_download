@@ -2,6 +2,7 @@ use std::io::Cursor;
 use fast2s::convert;
 use image::{ImageFormat, ImageReader};
 use image::codecs::jpeg::JpegEncoder;
+use semver::Version;
 
 pub fn t2s(str: &str) -> String {
     // traditional_to_simplified(str).to_string()
@@ -22,7 +23,7 @@ pub fn escape_epub_text(input: &str) -> String {
 }
 
 /// 将非png和jpg的图片转为jpg
-pub(crate) fn img_to_jpg(data: Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub fn img_to_jpg(data: Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let format = image::guess_format(&data)?;
     let img = match format {
         ImageFormat::Png => data,
@@ -36,6 +37,12 @@ pub(crate) fn img_to_jpg(data: Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::E
         }
     };
     Ok(img)
+}
+
+pub fn is_newer_version(local: &str, remote: &str) -> bool {
+    let local_ver = Version::parse(local).unwrap_or_else(|_| Version::new(0,0,0));
+    let remote_ver = Version::parse(remote.trim_start_matches('v')).unwrap_or_else(|_| Version::new(0,0,0));
+    remote_ver > local_ver
 }
 
 #[cfg(test)]

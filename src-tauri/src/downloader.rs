@@ -1,4 +1,5 @@
-use crate::client::*;
+use crate::paragraph_restorer::ParagraphRestorer;
+use crate::{client::*, paragraph_restorer};
 use crate::epub_builder::{Body, ContentBlock, EpubBuilder, Metadata};
 use crate::model::{BookInfo, Content, Message, VolumeInfo};
 use crate::parse::{parse_metadata, parse_novel_text, parse_vol_desc, parse_volume_list};
@@ -397,8 +398,8 @@ impl Downloader {
                 }
 
                 self.message.send("\n  插图下载失败，正在重试");
-                self.message.send(&format!("  {}", img_url_list[i]));
                 self.message.send(&format!("  {}", img_source_list[i]));
+                self.message.send(&format!("  {}", img_url_list[i]));
                 sleep(std::time::Duration::from_secs(5));
             }
 
@@ -474,6 +475,7 @@ impl Downloader {
         }
     }
 
+    /// 返回下一章节url
     fn get_chapter_text(
         &self,
         url: &str,
@@ -481,12 +483,20 @@ impl Downloader {
         img_list: &mut Vec<String>,
     ) -> Result<String> {
         let html = self.client.get_html(&url, &self.message, self.sleep_time)?;
-        parse_novel_text(&html, chapter_text, img_list, &self.base_url);
+        let mut chapter = Vec::new();
+        parse_novel_text(&html, &mut chapter, img_list, &self.base_url);
 
-        if chapter_text.is_empty() {
+        if chapter.is_empty() {
             self.message.send("   章节内容为空");
             return Err(anyhow!("Chapter text is empty"));
         }
+
+        let chapter_id = url.split("/").last().unwrap().split(".").next().unwrap().split("_").next().unwrap().parse::<u64>().unwrap();
+
+        let restorer = ParagraphRestorer::new(chapter_id);
+        let chapter = restorer.restore(chapter);
+
+        chapter_text.extend(chapter);
 
         // 文本解密
         if html.contains(r#"font-family: "read""#) {
