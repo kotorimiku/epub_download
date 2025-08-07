@@ -12,6 +12,7 @@ pub mod paragraph_restorer;
 
 #[cfg(feature = "gui")]
 pub mod command;
+pub mod event;
 
 #[cfg(feature = "gui")]
 use crate::command::{download, get_book_info, get_config_vue, save_config, check_update};

@@ -16,6 +16,7 @@ impl ParagraphRestorer {
 
     /// 从字符串列表中恢复正确顺序
     ///
+    /// chapterlog.js?v1006a6
     /// 实现与JavaScript相同的逻辑：
     /// - 如果段落数量 <= 19，保持原顺序
     /// - 如果段落数量 > 19，前19个保持原顺序，后面的需要恢复
@@ -102,8 +103,16 @@ impl ParagraphRestorer {
         result
     }
 
+    pub fn restore_with_index(text: Vec<Content>, index_list: Vec<usize>) -> Vec<Content> {
+        let mut restored = vec![];
+        for i in index_list {
+            restored.push(text[i].clone());
+        }
+        restored
+    }
+
     /// 生成种子值
-    fn generate_seed(chapter_id: u64) -> u64 {
+    pub fn generate_seed(chapter_id: u64) -> u64 {
         (chapter_id * 0x89) + 0xe9
     }
 }
@@ -128,6 +137,8 @@ mod tests {
         parse::parse_novel_text(&html, &mut text, &mut img_list, &config.base_url);
 
         let restorer = ParagraphRestorer::new(2);
+        // 2 507
+        println!("seed: {}", ParagraphRestorer::generate_seed(2));
 
         // 恢复正确顺序
         let restored = restorer.restore(text);

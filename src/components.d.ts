@@ -19,5 +19,6 @@ declare module 'vue' {
     NNotificationProvider: typeof import('naive-ui')['NNotificationProvider']
     NTooltip: typeof import('naive-ui')['NTooltip']
     Search: typeof import('./views/Search.vue')['default']
+    Web: typeof import('./views/Web.vue')['default']
   }
 }

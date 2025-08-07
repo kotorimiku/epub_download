@@ -52,12 +52,17 @@ impl Metadata {
 }
 
 pub enum Body {
+    /// chapter的html
     Html(Vec<String>),
+    /// chapter的内容块
     Blocks(Vec<Vec<ContentBlock>>),
 }
 
 pub enum ContentBlock {
+    /// html中的标签
+    Tag(String),
     Text(String),
+    /// images中的索引
     Image(usize),
 }
 
@@ -93,6 +98,7 @@ impl EpubBuilder {
                                     remove_invalid_xml_chars(&escape_epub_text(&text)),
                                 ),
                                 ContentBlock::Image(_) => block,
+                                ContentBlock::Tag(tag) => ContentBlock::Tag(remove_invalid_xml_chars(&tag)),
                             })
                             .collect()
                     })
@@ -178,6 +184,7 @@ impl EpubBuilder {
                 chapter
                     .iter()
                     .map(|block| match block {
+                        ContentBlock::Tag(tag) => tag.to_string(),
                         ContentBlock::Text(text) => {
                             if text.is_empty() {
                                 String::from("<br/>")

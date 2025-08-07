@@ -1282,7 +1282,7 @@ dependencies = [
 
 [[package]]
 name = "epub_download"
-version = "1.4.2"
+version = "1.4.3"
 dependencies = [
  "anyhow",
  "chrono",

@@ -1,6 +1,6 @@
-use crate::paragraph_restorer::ParagraphRestorer;
-use crate::{client::*, paragraph_restorer};
+use crate::client::*;
 use crate::epub_builder::{Body, ContentBlock, EpubBuilder, Metadata};
+use crate::event::Event;
 use crate::model::{BookInfo, Content, Message, VolumeInfo};
 use crate::parse::{parse_metadata, parse_novel_text, parse_vol_desc, parse_volume_list};
 use crate::secret::decode_text;
@@ -25,6 +25,7 @@ pub struct Downloader {
     pub sleep_time: u32,
     pub add_catalog: bool,
     pub error_img: HashSet<String>,
+    pub event: Option<Event>,
 }
 
 fn get_metadata(book_id: &str, client: &BiliClient, message: &Message) -> Result<BookInfo> {
@@ -52,6 +53,7 @@ impl Downloader {
         cookie: &str,
         add_catalog: bool,
         error_img: HashSet<String>,
+        event: Option<Event>,
     ) -> Result<Self> {
         let client = BiliClient::new(&base_url, cookie);
         let book_info = get_metadata(&book_id, &client, &message)?;
@@ -71,6 +73,7 @@ impl Downloader {
             sleep_time,
             add_catalog,
             error_img,
+            event,
         })
     }
 
@@ -86,6 +89,7 @@ impl Downloader {
         cookie: &str,
         add_catalog: bool,
         error_img: HashSet<String>,
+        event: Option<Event>,
     ) -> Self {
         let client = BiliClient::new(&base_url, cookie);
         Self {
@@ -100,6 +104,7 @@ impl Downloader {
             sleep_time,
             add_catalog,
             error_img,
+            event,
         }
     }
 
@@ -184,7 +189,7 @@ impl Downloader {
             let color_page = chapters_raw.remove(0);
             let (info, mut images): (Vec<_>, Vec<_>) = color_page
                 .into_iter()
-                .partition(|content| matches!(content, Content::Text(_)));
+                .partition(|content| matches!(content, Content::Text(_) | Content::Tag(_)));
             // 分离封面
             if images.is_empty() {
                 self.message.send("  插图页无插图，删除插图页");
@@ -199,7 +204,8 @@ impl Downloader {
             // 添加信息页
             let filter = info
                 .iter()
-                .filter(|content| !matches!(content, Content::Text(ref s) if s == ""))
+                .filter(|content| !matches!(content, Content::Text(ref s) if s.is_empty()))
+                .filter(|content| !matches!(content, Content::Tag(ref s) if s.is_empty() || s.contains("<br")))
                 .collect::<Vec<_>>();
             if filter.len() > 0 {
                 chapters_raw.insert(0, info);
@@ -469,6 +475,7 @@ impl Downloader {
                         }
                     }
                     Content::Text(text) => chapter.push(ContentBlock::Text(text.to_owned())),
+                    Content::Tag(tag) => chapter.push(ContentBlock::Tag(tag.to_owned())),
                 }
             }
             chapters.push(chapter);
@@ -483,18 +490,21 @@ impl Downloader {
         img_list: &mut Vec<String>,
     ) -> Result<String> {
         let html = self.client.get_html(&url, &self.message, self.sleep_time)?;
+        let html = self.event.as_ref().unwrap().html(&html)?;
+
         let mut chapter = Vec::new();
         parse_novel_text(&html, &mut chapter, img_list, &self.base_url);
 
         if chapter.is_empty() {
             self.message.send("   章节内容为空");
+            println!("{}", html);
             return Err(anyhow!("Chapter text is empty"));
         }
 
-        let chapter_id = url.split("/").last().unwrap().split(".").next().unwrap().split("_").next().unwrap().parse::<u64>().unwrap();
+        // let chapter_id = url.split("/").last().unwrap().split(".").next().unwrap().split("_").next().unwrap().parse::<u64>().unwrap();
 
-        let restorer = ParagraphRestorer::new(chapter_id);
-        let chapter = restorer.restore(chapter);
+        // let restorer = ParagraphRestorer::new(chapter_id);
+        // let chapter = restorer.restore(chapter);
 
         chapter_text.extend(chapter);
 
@@ -509,6 +519,16 @@ impl Downloader {
                     println!("解密前: {}", text);
                     println!("解密后: {}", new_text);
                     *text = new_text;
+                    break;
+                }
+                if let Content::Tag(tag) = content {
+                    if tag.contains("<br") || tag.is_empty() {
+                        continue;
+                    }
+                    let new_tag = decode_text(&tag);
+                    println!("解密前: {}", tag);
+                    println!("解密后: {}", new_tag);
+                    *tag = new_tag;
                     break;
                 }
             }

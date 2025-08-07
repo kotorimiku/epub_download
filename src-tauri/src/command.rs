@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::downloader::Downloader;
 use crate::error::Result;
+use crate::event::Event;
 use crate::model::{BookInfo, Message, VolumeInfo};
 use parking_lot::RwLock;
 use tauri::{AppHandle, State};
@@ -26,17 +27,20 @@ pub async fn get_book_info(
         )
     }; // config 在这里自动 drop 释放锁
 
+    let event = Event::new(app);
+
     let handle = tokio::task::spawn_blocking(move || {
         let result = Downloader::new(
             base_url,
             book_id,
             output,
             template,
-            Message::new(Some(app)),
+            Message::new(Some(event.clone())),
             sleep_time,
             &cookie,
             add_catalog,
             error_img,
+            Some(event),
         )?;
         Ok::<_, anyhow::Error>((result.book_info, result.volume_infos))
     });
@@ -69,7 +73,8 @@ pub async fn download(
         )
     };
 
-    let message = Message::new(Some(app));
+    let event = Event::new(app);
+    let message = Message::new(Some(event.clone()));
 
     let handle = tokio::task::spawn_blocking(move || {
         let downloader = Downloader::new_from(
@@ -84,12 +89,24 @@ pub async fn download(
             &cookie,
             add_catalog,
             error_img,
+            Some(event),
         );
         downloader.download(volume_no_list.into_iter())
     });
 
     let result = handle.await??;
 
+    Ok(result)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_page_text() -> Result<String> {
+    let handle = tokio::task::spawn_blocking(move || {
+        let client = crate::client::BiliClient::new("https://www.bilinovel.com", "");
+        client.check_update()
+    });
+    let result = handle.await??;
     Ok(result)
 }
 

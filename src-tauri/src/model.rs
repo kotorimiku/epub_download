@@ -1,9 +1,6 @@
 use serde::{self, Serialize, Deserialize};
 use specta::Type;
 
-#[cfg(feature = "gui")]
-use tauri::Emitter;
-
 #[derive(Debug, Serialize, Deserialize, Type)]
 pub struct BookInfo {
     pub title: Option<String>,
@@ -26,6 +23,7 @@ pub struct VolumeInfo {
 
 #[derive(Debug, Clone)]
 pub enum Content {
+    Tag(String),
     Text(String),
     Image(String),
 }
@@ -41,7 +39,7 @@ impl Content {
 }
 
 #[cfg(feature = "gui")]
-type App = tauri::AppHandle;
+type App = crate::event::Event;
 
 #[cfg(not(feature = "gui"))]
 type App = ();
@@ -60,7 +58,7 @@ impl Message {
         #[cfg(feature = "gui")]
         {
             if let Some(app) = &self.app {
-                app.emit("message", msg).unwrap();
+                app.message(msg);
                 return;
             }
         }
@@ -72,7 +70,7 @@ impl Message {
         #[cfg(feature = "gui")]
         {
             if let Some(app) = &self.app {
-                app.emit("image", msg).unwrap();
+                app.message(msg);
                 return;
             }
         }

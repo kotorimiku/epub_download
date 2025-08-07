@@ -1,7 +1,12 @@
 <template>
-  <div class="p-2 space-y-4">
-    <div class="flex items-center gap-2">
-      <n-input v-model:value="bookId" placeholder="请输入书籍ID" class="w-64" />
+  <div class="p-2 space-y-4 h-full flex flex-col">
+    <div class="flex items-center gap-2 h-10">
+      <n-input
+        v-model:value="bookId"
+        placeholder="请输入书籍ID"
+        class="w-64"
+        @keyup.enter="search"
+      />
       <n-button type="primary" @click="search">搜索</n-button>
       <n-button :disabled="!volumeList.length" @click="download" type="success">
         开始下载
@@ -10,7 +15,7 @@
       <n-button @click="selectInverse">反选</n-button>
     </div>
 
-    <div class="flex gap-4 h-75vh">
+    <div class="flex gap-4 h-80vh">
       <n-card class="flex-1">
         <template #cover>
           <div ref="messageBox" class="h-full overflow-y-auto ml-5">
@@ -185,11 +190,7 @@
   const scrollToBottom = () => {
     nextTick(() => {
       if (messageBox.value) {
-        console.log(messageBox.value.scrollHeight);
-
         messageBox.value.scrollTop = messageBox.value.scrollHeight;
-
-        console.log(messageBox.value.scrollTop);
       }
     });
   };
