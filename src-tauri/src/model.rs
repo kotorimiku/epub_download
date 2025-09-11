@@ -1,4 +1,4 @@
-use serde::{self, Serialize, Deserialize};
+use serde::{self, Deserialize, Serialize};
 use specta::Type;
 
 #[derive(Debug, Serialize, Deserialize, Type)]
@@ -21,6 +21,26 @@ pub struct VolumeInfo {
     pub cover: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct Book {
+    pub id: String,
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub publisher: Option<String>,
+    pub tags: Vec<String>,
+    pub description: Option<String>,
+    pub volume_list: Vec<Volume>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct Volume {
+    pub title: Option<String>,
+    pub url_vol: String,
+    pub volume_no: u32,
+    pub updated_at: String,
+    pub path: String,
+}
+
 #[derive(Debug, Clone)]
 pub enum Content {
     Tag(String),
@@ -39,42 +59,7 @@ impl Content {
 }
 
 #[cfg(feature = "gui")]
-type App = crate::event::Event;
+pub type App = tauri::AppHandle;
 
 #[cfg(not(feature = "gui"))]
-type App = ();
-
-pub struct Message {
-    #[allow(dead_code)]
-    app: Option<App>,
-}
-
-impl Message {
-    pub fn new(app: Option<App>) -> Self {
-        Message { app: app }
-    }
-
-    pub fn send(&self, msg: &str) {
-        #[cfg(feature = "gui")]
-        {
-            if let Some(app) = &self.app {
-                app.message(msg);
-                return;
-            }
-        }
-
-        println!("{}", msg);
-    }
-
-    pub fn print(&self, msg: &str) {
-        #[cfg(feature = "gui")]
-        {
-            if let Some(app) = &self.app {
-                app.message(msg);
-                return;
-            }
-        }
-
-        print!("{}", msg);
-    }
-}
+pub type App = ();

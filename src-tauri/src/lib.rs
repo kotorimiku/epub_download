@@ -4,38 +4,43 @@ pub mod config;
 pub mod downloader;
 pub mod epub_builder;
 pub mod error;
+pub mod manage;
+pub mod message;
 pub mod model;
+pub mod paragraph_restorer;
 pub mod parse;
 pub mod secret;
 pub mod utils;
-pub mod paragraph_restorer;
 
 #[cfg(feature = "gui")]
 pub mod command;
-pub mod event;
-
 #[cfg(feature = "gui")]
-use crate::command::{download, get_book_info, get_config_vue, save_config, check_update};
-use crate::config::Config;
-
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use parking_lot::RwLock;
-use tauri_specta::{collect_commands, Builder};
+pub mod event;
 
 #[cfg(feature = "gui")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    use crate::command::*;
+    use crate::config::Config;
+    use parking_lot::RwLock;
+    use tauri_specta::{collect_commands, Builder};
+
     let builder = Builder::<tauri::Wry>::new().commands(collect_commands![
         get_book_info,
         download,
         save_config,
         get_config_vue,
-        check_update
+        check_update,
+        get_books,
+        create_index,
     ]);
 
     #[cfg(debug_assertions)] // <- Only export on non-release builds
     builder
-        .export(specta_typescript::Typescript::default(), "../src/bindings.ts")
+        .export(
+            specta_typescript::Typescript::default(),
+            "../src/bindings.ts",
+        )
         .expect("Failed to export typescript bindings");
 
     tauri::Builder::default()

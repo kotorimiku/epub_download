@@ -132,14 +132,14 @@ pub fn parse_novel_text(
     html: &str,
     text: &mut Vec<Content>,
     img_list: &mut Vec<String>,
-    url_base: &str,
+    _url_base: &str,
 ) {
     let document = Html::parse_document(&html);
     let div_selector = Selector::parse("div").unwrap();
 
     for element in document.select(&div_selector) {
         if let Some(property) = element.value().attr("id") {
-            if property == get_html_property_map(url_base).get("get_text_div").unwrap() {
+            if property == "acontent" {
                 for child in element.child_elements() {
                     if child.value().name() == "img" {
                         let mut img = None;
@@ -193,16 +193,6 @@ pub fn parse_novel_text(
             }
         }
     }
-}
-
-pub fn get_html_property_map(url_base: &str) -> HashMap<String, String> {
-    let mut map = HashMap::new();
-    if url_base == "https://tw.linovelib.com" {
-        map.insert(String::from("get_text_div"), String::from("acontent"));
-    } else if url_base == "https://www.bilinovel.com" {
-        map.insert(String::from("get_text_div"), String::from("acontent"));
-    }
-    map
 }
 
 pub fn parse_vol_desc(html: &str) -> Option<String> {

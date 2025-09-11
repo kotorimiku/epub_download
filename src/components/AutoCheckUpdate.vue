@@ -1,3 +1,5 @@
+<template></template>
+
 <script setup lang="ts">
 import { onMounted, h } from "vue";
 import { commands } from "../bindings";
@@ -26,7 +28,8 @@ onMounted(async () => {
                 {
                   href: url,
                   target: "_blank",
-                  style: "color: #18a058; text-decoration: underline; cursor: pointer;",
+                  style:
+                    "color: #18a058; text-decoration: underline; cursor: pointer;",
                 },
                 url
               ),

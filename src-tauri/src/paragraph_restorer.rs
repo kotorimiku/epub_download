@@ -31,9 +31,10 @@ impl ParagraphRestorer {
             return paragraphs;
         }
 
-        let text_paragraphs: Vec<_> = paragraphs.iter().filter(|p| {
-            p.is_text() && !p.is_empty()
-        }).collect();
+        let text_paragraphs: Vec<_> = paragraphs
+            .iter()
+            .filter(|p| p.is_text() && !p.is_empty())
+            .collect();
 
         let n = text_paragraphs.len();
         const KEEP_ORDER_THRESHOLD: usize = 19; // 0x13
@@ -43,17 +44,25 @@ impl ParagraphRestorer {
             return paragraphs;
         }
 
-
         // 分割段落：前19个保持原顺序，后面的需要恢复
         let (keep_order, need_restore): (Vec<_>, Vec<_>) = text_paragraphs
-            .into_iter().enumerate()
+            .into_iter()
+            .enumerate()
             .partition(|(i, _)| *i < KEEP_ORDER_THRESHOLD);
 
         // 只对需要恢复的部分进行排序
-        let restored_part = self.restore_partial(need_restore.into_iter().map(|(_, content)| content.clone()).collect());
+        let restored_part = self.restore_partial(
+            need_restore
+                .into_iter()
+                .map(|(_, content)| content.clone())
+                .collect(),
+        );
 
         // 合并结果：保持原顺序的部分 + 恢复的部分
-        let mut result = keep_order.into_iter().map(|(_, content)| content.clone()).collect::<Vec<_>>();
+        let mut result = keep_order
+            .into_iter()
+            .map(|(_, content)| content.clone())
+            .collect::<Vec<_>>();
         result.extend(restored_part);
 
         let mut i = 0;
@@ -80,7 +89,6 @@ impl ParagraphRestorer {
         }
 
         let seed = Self::generate_seed(self.chapter_id);
-
 
         let mut indices: Vec<usize> = (0..n).collect();
         let mut current_seed = seed;
@@ -128,9 +136,16 @@ mod tests {
     fn test_paragraph_restorer() {
         let config = config::Config::new();
 
-        let client = client::BiliClient::new(config.base_url.as_str(), config.cookie.as_str());
+        let client = client::BiliClient::new(
+            config.base_url.as_str(),
+            config.cookie.as_str(),
+            config.user_agent.as_str(),
+        )
+        .unwrap();
 
-        let html = client.get("https://www.bilinovel.com/novel/1/2.html").unwrap();
+        let html = client
+            .get("https://www.bilinovel.com/novel/1/2.html")
+            .unwrap();
 
         let mut text = vec![];
         let mut img_list = vec![];
@@ -147,6 +162,5 @@ mod tests {
         for (i, paragraph) in restored.iter().enumerate() {
             println!("{}. {:?}", i + 1, paragraph);
         }
-
     }
 }

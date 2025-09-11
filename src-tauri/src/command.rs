@@ -1,8 +1,7 @@
 use crate::config::Config;
 use crate::downloader::Downloader;
 use crate::error::Result;
-use crate::event::Event;
-use crate::model::{BookInfo, Message, VolumeInfo};
+use crate::model::{Book, BookInfo, VolumeInfo};
 use parking_lot::RwLock;
 use tauri::{AppHandle, State};
 
@@ -13,7 +12,7 @@ pub async fn get_book_info(
     app: AppHandle,
     book_id: String,
 ) -> Result<(BookInfo, Vec<VolumeInfo>)> {
-    let (base_url, output, template, sleep_time, cookie, add_catalog, error_img) = {
+    let (base_url, output, template, sleep_time, cookie, user_agent, add_catalog, error_img) = {
         let config = config.read();
 
         (
@@ -22,12 +21,11 @@ pub async fn get_book_info(
             config.template.clone(),
             config.sleep_time,
             config.cookie.clone(),
+            config.user_agent.clone(),
             config.add_catalog,
             config.error_img.clone(),
         )
     }; // config 在这里自动 drop 释放锁
-
-    let event = Event::new(app);
 
     let handle = tokio::task::spawn_blocking(move || {
         let result = Downloader::new(
@@ -35,12 +33,12 @@ pub async fn get_book_info(
             book_id,
             output,
             template,
-            Message::new(Some(event.clone())),
             sleep_time,
             &cookie,
+            &user_agent,
             add_catalog,
             error_img,
-            Some(event),
+            Some(app),
         )?;
         Ok::<_, anyhow::Error>((result.book_info, result.volume_infos))
     });
@@ -60,7 +58,7 @@ pub async fn download(
     volume_list: Vec<VolumeInfo>,
     volume_no_list: Vec<u32>,
 ) -> Result<()> {
-    let (base_url, output, template, sleep_time, cookie, add_catalog, error_img) = {
+    let (base_url, output, template, sleep_time, cookie, user_agent, add_catalog, error_img) = {
         let config = config.read();
         (
             config.base_url.clone(),
@@ -68,13 +66,11 @@ pub async fn download(
             config.template.clone(),
             config.sleep_time,
             config.cookie.clone(),
+            config.user_agent.clone(),
             config.add_catalog,
             config.error_img.clone(),
         )
     };
-
-    let event = Event::new(app);
-    let message = Message::new(Some(event.clone()));
 
     let handle = tokio::task::spawn_blocking(move || {
         let downloader = Downloader::new_from(
@@ -84,29 +80,18 @@ pub async fn download(
             book_info,
             volume_list,
             template,
-            message,
             sleep_time,
             &cookie,
+            &user_agent,
             add_catalog,
             error_img,
-            Some(event),
-        );
+            Some(app),
+        )?;
         downloader.download(volume_no_list.into_iter())
     });
 
     let result = handle.await??;
 
-    Ok(result)
-}
-
-#[tauri::command]
-#[specta::specta]
-pub async fn get_page_text() -> Result<String> {
-    let handle = tokio::task::spawn_blocking(move || {
-        let client = crate::client::BiliClient::new("https://www.bilinovel.com", "");
-        client.check_update()
-    });
-    let result = handle.await??;
     Ok(result)
 }
 
@@ -129,9 +114,24 @@ pub async fn get_config_vue(config: State<'_, RwLock<Config>>) -> Result<Config>
 #[specta::specta]
 pub async fn check_update() -> Result<String> {
     let handle = tokio::task::spawn_blocking(move || {
-        let client = crate::client::BiliClient::new("https://www.bilinovel.com", "");
+        let client = crate::client::BiliClient::new("https://www.bilinovel.com", "", "")?;
         client.check_update()
     });
     let result = handle.await??;
     Ok(result)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_books() -> Result<Vec<Book>> {
+    let books = crate::manage::get_books(crate::config::INDEX_FILE)?;
+    Ok(books)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn create_index(config: State<'_, RwLock<Config>>) -> Result<()> {
+    let config = config.read();
+    crate::manage::create_index(&config.output, crate::config::INDEX_FILE)?;
+    Ok(())
 }

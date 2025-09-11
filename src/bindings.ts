@@ -44,6 +44,22 @@ async checkUpdate() : Promise<Result<string, CommandError>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async getBooks() : Promise<Result<Book[], CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_books") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async createIndex() : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_index") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -57,9 +73,11 @@ async checkUpdate() : Promise<Result<string, CommandError>> {
 
 /** user-defined types **/
 
+export type Book = { id: string; title: string | null; author: string | null; publisher: string | null; tags: string[]; description: string | null; volume_list: Volume[] }
 export type BookInfo = { title: string | null; author: string | null; publisher: string | null; tags: string[]; description: string | null; cover: string | null }
 export type CommandError = string
-export type Config = { output?: string; template?: string; cookie?: string; sleepTime?: number; baseUrl?: string; addCatalog?: boolean; errorImg?: string[]; autoCheckUpdate?: boolean }
+export type Config = { output?: string; template?: string; cookie?: string; userAgent?: string; sleepTime?: number; baseUrl?: string; addCatalog?: boolean; errorImg?: string[]; autoCheckUpdate?: boolean }
+export type Volume = { title: string | null; url_vol: string; volume_no: number; updated_at: string; path: string }
 export type VolumeInfo = { title: string | null; chapter_list: string[]; chapter_path_list: string[]; url_vol: string | null; volume_no: number; cover: string | null }
 
 /** tauri-specta globals **/

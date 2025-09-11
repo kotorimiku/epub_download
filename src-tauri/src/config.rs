@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::fs::{read_to_string, write};
 
 const CONFIG_FILE: &str = "./config.json";
+pub const INDEX_FILE: &str = "./index.json";
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Type)]
 #[serde(rename_all = "camelCase")]
@@ -14,6 +15,8 @@ pub struct Config {
     pub template: String,
     #[serde(default = "default_cookie")]
     pub cookie: String,
+    #[serde(default = "default_user_agent")]
+    pub user_agent: String,
     #[serde(default = "default_sleep_time")]
     pub sleep_time: u32,
     #[serde(default = "default_base_url")]
@@ -32,6 +35,7 @@ impl Config {
             output: String::from("./"),
             template: "{{book_title}}-{{chapter_title}}".to_string(),
             cookie: String::from(""),
+            user_agent: String::from(""),
             sleep_time: 8,
             base_url: String::from("https://www.bilinovel.com"),
             add_catalog: false,
@@ -65,6 +69,10 @@ fn default_template() -> String {
 }
 
 fn default_cookie() -> String {
+    String::from("")
+}
+
+fn default_user_agent() -> String {
     String::from("")
 }
 
