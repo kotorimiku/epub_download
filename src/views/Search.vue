@@ -11,6 +11,7 @@
       <n-button :disabled="!volumeList.length" @click="download" type="success">
         开始下载
       </n-button>
+      <n-button @click="cancelDownload">取消下载</n-button>
       <n-button @click="selectAll">全选</n-button>
       <n-button @click="selectInverse">反选</n-button>
     </div>
@@ -180,6 +181,13 @@ const download = async () => {
   });
 
   isDownloading.value = false;
+};
+
+// 取消下载
+const cancelDownload = async () => {
+  runCommand({
+    command: () => commands.cancelDownload(),
+  });
 };
 
 // 滚动到底部

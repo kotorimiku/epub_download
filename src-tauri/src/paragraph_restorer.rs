@@ -132,8 +132,8 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_paragraph_restorer() {
+    #[tokio::test]
+    async fn test_paragraph_restorer() {
         let config = config::Config::new();
 
         let client = client::BiliClient::new(
@@ -145,6 +145,7 @@ mod tests {
 
         let html = client
             .get("https://www.bilinovel.com/novel/1/2.html")
+            .await
             .unwrap();
 
         let mut text = vec![];

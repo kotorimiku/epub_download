@@ -23,11 +23,18 @@ pub fn run() {
     use crate::command::*;
     use crate::config::Config;
     use parking_lot::RwLock;
+    use std::sync::Arc;
     use tauri_specta::{collect_commands, Builder};
+    use tokio::sync::broadcast;
+
+    // 创建取消通道
+    let (cancel_sender, _) = broadcast::channel::<()>(1);
+    let cancel_sender = Arc::new(cancel_sender);
 
     let builder = Builder::<tauri::Wry>::new().commands(collect_commands![
         get_book_info,
         download,
+        cancel_download,
         save_config,
         get_config_vue,
         check_update,
@@ -47,6 +54,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(builder.invoke_handler())
         .manage(RwLock::new(Config::load()))
+        .manage(cancel_sender)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

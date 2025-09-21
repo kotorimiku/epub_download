@@ -21,6 +21,14 @@ async download(bookId: string, bookInfo: BookInfo, volumeList: VolumeInfo[], vol
     else return { status: "error", error: e  as any };
 }
 },
+async cancelDownload() : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cancel_download") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async saveConfig(newConfig: Config) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("save_config", { newConfig }) };

@@ -1,6 +1,6 @@
 [package]
 name = "epub_download"
-version = "1.4.4"
+version = "1.4.5"
 description = "bilinovel downloader"
 authors = ["kotorimiku"]
 edition = "2021"
@@ -35,7 +35,7 @@ specta-typescript = { version = "0.0.9" }
 reqwest = {version = "0.12.23", features = ["blocking", "gzip", "deflate", "brotli", "zstd", "json"] }
 scraper = "0.24.0"
 zip = "5.0.0"
-tokio = "1.42.0"
+tokio = { version = "1.42.0", features = ["full"] }
 regex = "1.11.1"
 chrono = { version = "0.4.39" }
 fast2s = "0.3.1"

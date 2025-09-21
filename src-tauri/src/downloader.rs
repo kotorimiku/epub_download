@@ -27,22 +27,28 @@ pub struct Downloader {
     pub app_handle: Option<tauri::AppHandle>,
 }
 
-fn get_metadata(book_id: &str, client: &BiliClient, app_handle: &Option<App>) -> Result<BookInfo> {
-    Ok(parse_metadata(&client.get_novel(book_id, app_handle)?))
+async fn get_metadata(
+    book_id: &str,
+    client: &BiliClient,
+    app_handle: &Option<App>,
+) -> Result<BookInfo> {
+    Ok(parse_metadata(
+        &client.get_novel(book_id, app_handle).await?,
+    ))
 }
 
-fn get_volume_list(
+async fn get_volume_list(
     book_id: &str,
     client: &BiliClient,
     app_handle: &Option<App>,
 ) -> Result<Vec<VolumeInfo>> {
     Ok(parse_volume_list(
-        &client.get_volume_catalog(book_id, app_handle)?,
+        &client.get_volume_catalog(book_id, app_handle).await?,
     ))
 }
 
 impl Downloader {
-    pub fn new(
+    pub async fn new(
         base_url: String,
         book_id: String,
         output: String,
@@ -55,11 +61,11 @@ impl Downloader {
         app_handle: Option<tauri::AppHandle>,
     ) -> Result<Self> {
         let client = BiliClient::new(&base_url, cookie, user_agent)?;
-        let book_info = get_metadata(&book_id, &client, &app_handle)?;
+        let book_info = get_metadata(&book_id, &client, &app_handle).await?;
         if book_info.title.is_none() {
             return Err(anyhow!("Book not found"));
         }
-        let volume_infos = get_volume_list(book_id.as_str(), &client, &app_handle)?;
+        let volume_infos = get_volume_list(book_id.as_str(), &client, &app_handle).await?;
         Ok(Self {
             base_url,
             book_id,
@@ -105,7 +111,7 @@ impl Downloader {
         })
     }
 
-    pub fn download<I>(&self, volume_no: I) -> Result<()>
+    pub async fn download<I>(&self, volume_no: I) -> Result<()>
     where
         I: Iterator<Item = u32>,
         I: IntoIterator<Item = u32>,
@@ -121,13 +127,14 @@ impl Downloader {
         io::stdout().flush().unwrap();
         for no in volume_no {
             if let Some(volume) = self.volume_infos.get(no as usize - 1) {
-                self.download_single(&mut volume.clone(), no as usize)?;
+                self.download_single(&mut volume.clone(), no as usize)
+                    .await?;
             }
         }
         Ok(())
     }
 
-    fn download_single(&self, volume: &mut VolumeInfo, volume_no: usize) -> Result<()> {
+    async fn download_single(&self, volume: &mut VolumeInfo, volume_no: usize) -> Result<()> {
         if volume.chapter_path_list.is_empty() {
             send(&self.app_handle, "章节列表为空");
             return Ok(());
@@ -152,9 +159,9 @@ impl Downloader {
         // 图片来源列表
         let mut img_source_list = Vec::new();
 
-        let vol_desc = self.get_vol_desc(volume.url_vol.as_ref().unwrap())?;
+        let vol_desc = self.get_vol_desc(volume.url_vol.as_ref().unwrap()).await?;
 
-        let mut url = self.get_start_next_url(volume, volume_no)?;
+        let mut url = self.get_start_next_url(volume, volume_no).await?;
         // let first_url = url.clone();
 
         for i in 0..volume.chapter_list.len() {
@@ -163,7 +170,9 @@ impl Downloader {
                 &format!("  -正在下载第{}章，{}", i + 1, volume.chapter_list[i]),
             );
             let mut chapter_text = Vec::new();
-            let next_url = self.get_chapter_text(&url, &mut chapter_text, &mut image_urls)?;
+            let next_url = self
+                .get_chapter_text(&url, &mut chapter_text, &mut image_urls)
+                .await?;
             for _ in img_source_list.len()..image_urls.len() {
                 img_source_list.push(url.clone());
             }
@@ -253,7 +262,9 @@ impl Downloader {
         }
 
         //下载插图
-        let img_data_list = self.download_img_list(&image_urls, &img_source_list)?;
+        let img_data_list = self
+            .download_img_list(&image_urls, &img_source_list)
+            .await?;
 
         //制作epub
         let metadata = Metadata::new(
@@ -293,43 +304,48 @@ impl Downloader {
         Ok(())
     }
 
-    fn get_vol_desc(&self, url: &str) -> Result<Option<String>> {
+    async fn get_vol_desc(&self, url: &str) -> Result<Option<String>> {
         let url = if !url.starts_with("http") {
             format!("{}{}", self.base_url, url).as_str().to_string()
         } else {
             url.to_string()
         };
 
-        let html = self.client.get_html(&url, &self.app_handle, 0)?;
+        let html = self.client.get_html(&url, &self.app_handle, 0).await?;
         let desc = parse_vol_desc(&html);
         Ok(desc)
     }
 
-    fn get_start_next_url(&self, volume: &VolumeInfo, volume_no: usize) -> Result<String> {
+    async fn get_start_next_url(&self, volume: &VolumeInfo, volume_no: usize) -> Result<String> {
         let mut next_url = self.base_url.clone() + &volume.chapter_path_list[0].clone();
         if next_url.contains("javascript") {
             let pre_volume = &self.volume_infos[volume_no - 2];
             let pre_url_path = pre_volume.chapter_path_list.last().unwrap();
             let url = self.base_url.clone() + pre_url_path;
-            next_url = self.get_next_chapter_url(&self.client.get_html(
-                &url,
-                &self.app_handle,
-                self.sleep_time,
-            )?)?;
+            next_url = self
+                .get_next_chapter_url(
+                    &self
+                        .client
+                        .get_html(&url, &self.app_handle, self.sleep_time)
+                        .await?,
+                )
+                .await?;
         }
         Ok(next_url)
     }
 
-    fn get_next_chapter_url(&self, html: &str) -> Result<String> {
-        let url = self.get_next_url(html)?;
-        if url.contains("_") {
-            return self.get_next_chapter_url(&self.client.get_html(
-                &url,
-                &self.app_handle,
-                self.sleep_time,
-            )?);
-        } else {
-            return Ok(url);
+    async fn get_next_chapter_url(&self, html: &str) -> Result<String> {
+        let mut current_html = html.to_string();
+        loop {
+            let url = self.get_next_url(&current_html)?;
+            if url.contains("_") {
+                current_html = self
+                    .client
+                    .get_html(&url, &self.app_handle, self.sleep_time)
+                    .await?;
+            } else {
+                return Ok(url);
+            }
         }
     }
 
@@ -384,7 +400,7 @@ impl Downloader {
         Ok(dir.join(format!("{}.epub", file_name)))
     }
 
-    fn download_img_list(
+    async fn download_img_list(
         &self,
         img_url_list: &Vec<String>,
         img_source_list: &Vec<String>,
@@ -396,7 +412,7 @@ impl Downloader {
             let mut img_data = Vec::new();
             let mut error_img = false;
             for _ in 0..50 {
-                if let Ok(data) = self.client.get_img_bytes(&img_url_list[i]) {
+                if let Ok(data) = self.client.get_img_bytes(&img_url_list[i]).await {
                     img_data = data;
                     break;
                 }
@@ -492,7 +508,7 @@ impl Downloader {
     }
 
     /// 返回下一章节url
-    fn get_chapter_text(
+    async fn get_chapter_text(
         &self,
         url: &str,
         chapter_text: &mut Vec<Content>,
@@ -500,7 +516,8 @@ impl Downloader {
     ) -> Result<String> {
         let html = self
             .client
-            .get_html(&url, &self.app_handle, self.sleep_time)?;
+            .get_html(&url, &self.app_handle, self.sleep_time)
+            .await?;
         let html = crate::event::html(self.app_handle.as_ref().unwrap(), &html)?;
 
         let mut chapter = Vec::new();
@@ -545,12 +562,26 @@ impl Downloader {
             }
         }
 
-        let next_url = self.get_next_url(&html)?;
-        if next_url.contains("_") {
+        let mut current_url = self.get_next_url(&html)?;
+        while current_url.contains("_") {
             send(&self.app_handle, "   正在下载分页");
-            return self.get_chapter_text(&next_url, chapter_text, img_list);
-        } else {
-            return Ok(next_url);
+            let html = self
+                .client
+                .get_html(&current_url, &self.app_handle, self.sleep_time)
+                .await?;
+            let html = crate::event::html(self.app_handle.as_ref().unwrap(), &html)?;
+
+            let mut chapter = Vec::new();
+            parse_novel_text(&html, &mut chapter, img_list, &self.base_url);
+
+            if chapter.is_empty() {
+                return Err(anyhow!("无法获取章节内容"));
+            }
+
+            chapter_text.extend(chapter);
+
+            current_url = self.get_next_url(&html)?;
         }
+        Ok(current_url)
     }
 }

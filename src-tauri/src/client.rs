@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use anyhow::Result;
-use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, COOKIE, USER_AGENT};
+use reqwest::Client;
 use url::Url;
 
 use crate::message::send;
@@ -72,90 +72,99 @@ impl BiliClient {
         })
     }
 
-    pub fn get(&self, url: &str) -> Result<String> {
-        if let Ok(res) = self.client.get(url).send() {
-            return res.text().map_err(|e| anyhow!(e));
+    pub async fn get(&self, url: &str) -> Result<String> {
+        if let Ok(res) = self.client.get(url).send().await {
+            return res.text().await.map_err(|e| anyhow!(e));
         } else {
             return Err(anyhow!("请求失败"));
         }
     }
 
-    pub fn get_html(&self, url: &str, message: &Option<App>, sleep_time: u32) -> Result<String> {
+    pub async fn get_html(
+        &self,
+        url: &str,
+        message: &Option<App>,
+        sleep_time: u32,
+    ) -> Result<String> {
         println!("  {url}");
 
-        std::thread::sleep(std::time::Duration::from_secs(sleep_time.into()));
-        if let Ok(res) = self.client.get(url).send() {
-            if res.url().as_str() != url {
-                send(message, "url重定向");
-                send(message, &format!("原始url: {}", url));
-                send(message, &format!("重定向到: {}", res.url()));
-                return Err(anyhow!("url重定向"));
+        tokio::time::sleep(std::time::Duration::from_secs(sleep_time.into())).await;
+
+        loop {
+            if let Ok(res) = self.client.get(url).send().await {
+                if res.url().as_str() != url {
+                    send(message, "url重定向");
+                    send(message, &format!("原始url: {}", url));
+                    send(message, &format!("重定向到: {}", res.url()));
+                    return Err(anyhow!("url重定向"));
+                }
+                if let Ok(t) = res.text().await {
+                    let mut text = t;
+                    if url.contains("tw.linovelib.com") {
+                        text = t2s(&text);
+                    }
+                    if text.contains("used Cloudflare to restrict access") {
+                        send(message, "下载频繁，触发反爬，正在重试....");
+                        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                        continue; // 重试
+                    }
+                    if text.contains("Just a moment...") || text.contains("403 Forbidden") {
+                        send(message, "下载失败，请稍后再试");
+                        return Err(anyhow!("下载失败，请稍后再试"));
+                    }
+                    if text.contains("對不起，該書內容已刪除")
+                        || text.contains("对不起，该书内容已删除")
+                    {
+                        send(message, "该书内容已删除");
+                        return Err(anyhow!("该书内容已删除"));
+                    }
+                    if text.contains("章節內容審核未通過") || text.contains("章节内容审核未通过")
+                    {
+                        send(message, "该书内容审核未通过");
+                        return Err(anyhow!("该书内容审核未通过"));
+                    }
+                    if text.contains("抱歉，该小说未经审核")
+                        || text.contains("抱歉，該小說未經審核")
+                    {
+                        send(message, "该小说未经审核");
+                        return Err(anyhow!("该小说未经审核"));
+                    }
+                    if text.contains("抱歉，該小說不存在") || text.contains("抱歉，该小说不存在")
+                    {
+                        send(message, "该小说不存在");
+                        return Err(anyhow!("该小说不存在"));
+                    }
+                    if text.contains("通告～客戶端停用中")
+                        || text.contains("通告～客户端停用中")
+                        || text.contains("內容加载失败")
+                        || text.contains("手机版页面由于相容性问题暂不支持电脑端阅读")
+                    {
+                        send(message, "无法下载完整内容，正在重试....");
+                        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                        continue; // 重试
+                    }
+                    return Ok(text);
+                }
             }
-            if let Ok(t) = res.text() {
-                let mut text = t;
-                if url.contains("tw.linovelib.com") {
-                    text = t2s(&text);
-                }
-                if text.contains("used Cloudflare to restrict access") {
-                    send(message, "下载频繁，触发反爬，正在重试....");
-                    std::thread::sleep(std::time::Duration::from_secs(10));
-                    return self.get_html(url, message, sleep_time);
-                }
-                if text.contains("Just a moment...") || text.contains("403 Forbidden") {
-                    send(message, "下载失败，请稍后再试");
-                    return Err(anyhow!("下载失败，请稍后再试"));
-                }
-                if text.contains("對不起，該書內容已刪除")
-                    || text.contains("对不起，该书内容已删除")
-                {
-                    send(message, "该书内容已删除");
-                    return Err(anyhow!("该书内容已删除"));
-                }
-                if text.contains("章節內容審核未通過") || text.contains("章节内容审核未通过")
-                {
-                    send(message, "该书内容审核未通过");
-                    return Err(anyhow!("该书内容审核未通过"));
-                }
-                if text.contains("抱歉，该小说未经审核") || text.contains("抱歉，該小說未經審核")
-                {
-                    send(message, "该小说未经审核");
-                    return Err(anyhow!("该小说未经审核"));
-                }
-                if text.contains("抱歉，該小說不存在") || text.contains("抱歉，该小说不存在")
-                {
-                    send(message, "该小说不存在");
-                    return Err(anyhow!("该小说不存在"));
-                }
-                if text.contains("通告～客戶端停用中")
-                    || text.contains("通告～客户端停用中")
-                    || text.contains("內容加载失败")
-                    || text.contains("手机版页面由于相容性问题暂不支持电脑端阅读")
-                {
-                    send(message, "无法下载完整内容，正在重试....");
-                    std::thread::sleep(std::time::Duration::from_secs(10));
-                    return self.get_html(url, message, sleep_time);
-                }
-                return Ok(text);
-            }
+            send(message, "请求失败，正在重试....");
+            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+            // 继续循环重试
         }
-        send(message, "请求失败，正在重试....");
-        std::thread::sleep(std::time::Duration::from_secs(3));
-        self.get_html(url, message, sleep_time)
     }
 
-    pub fn get_novel(&self, book_id: &str, message: &Option<App>) -> Result<String> {
+    pub async fn get_novel(&self, book_id: &str, message: &Option<App>) -> Result<String> {
         let url = self.base_url.join(&format!("/novel/{}.html", book_id))?;
 
-        self.get_html(url.as_str(), message, 0)
+        self.get_html(url.as_str(), message, 0).await
     }
 
-    pub fn get_volume_catalog(&self, book_id: &str, message: &Option<App>) -> Result<String> {
+    pub async fn get_volume_catalog(&self, book_id: &str, message: &Option<App>) -> Result<String> {
         let url = self.base_url.join(&format!("/novel/{}/catalog", book_id))?;
 
-        self.get_html(url.as_str(), message, 0)
+        self.get_html(url.as_str(), message, 0).await
     }
 
-    pub fn get_img_bytes(&self, url: &str) -> Result<Vec<u8>> {
+    pub async fn get_img_bytes(&self, url: &str) -> Result<Vec<u8>> {
         let mut client = self.client.get(url).header(
             ACCEPT,
             "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
@@ -166,10 +175,10 @@ impl BiliClient {
                 HeaderValue::from_static("https://www.masiro.me/"),
             );
         }
-        if let Ok(response) = client.send() {
+        if let Ok(response) = client.send().await {
             // let length = response.content_length().unwrap_or(0);
             // let code = response.status().as_u16();
-            let data = response.bytes()?;
+            let data = response.bytes().await?;
 
             // if code == 404 {
             //     self.message
@@ -191,10 +200,10 @@ impl BiliClient {
         return Err(anyhow!("插图下载失败"));
     }
 
-    pub fn check_update(&self) -> Result<String> {
+    pub async fn check_update(&self) -> Result<String> {
         let url = "https://api.github.com/repos/kotorimiku/epub_download/releases/latest";
-        let res = self.client.get(url).send()?;
-        let json = res.json::<serde_json::Value>()?;
+        let res = self.client.get(url).send().await?;
+        let json = res.json::<serde_json::Value>().await?;
         let version = json["tag_name"]
             .as_str()
             .ok_or_else(|| anyhow!("未获取到最新版本号"))?;
@@ -215,12 +224,13 @@ impl BiliClient {
 mod tests {
     use super::*;
 
-    #[test]
-    fn download_test() {
+    #[tokio::test]
+    async fn download_test() {
         let client = BiliClient::new("https://www.bilinovel.com", "", "");
         let result = client
             .unwrap()
             .get("https://www.bilinovel.com/novel/115/catalog")
+            .await
             .unwrap();
         println!("{}", result);
     }
