@@ -43,7 +43,7 @@ async fn get_volume_list(
     app_handle: &Option<App>,
 ) -> Result<Vec<VolumeInfo>> {
     Ok(parse_volume_list(
-        &client.get_volume_catalog(book_id, app_handle).await?,
+        &client.get_catalog(book_id, app_handle).await?,
     ))
 }
 

@@ -38,6 +38,7 @@ pub fn run() {
         save_config,
         get_config_vue,
         check_update,
+        get_version,
         get_books,
         create_index,
     ]);

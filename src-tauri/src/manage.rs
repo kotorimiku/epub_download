@@ -6,7 +6,11 @@ use serde::Deserialize;
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-use crate::model::{Book, Volume};
+use crate::{
+    client::BiliClient,
+    model::{Book, Volume},
+    parse::parse_last_update,
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename = "package", rename_all = "lowercase")]
@@ -71,6 +75,18 @@ pub fn build_index(path: &str) -> Result<Vec<Book>> {
                 } else {
                     return Err(anyhow::anyhow!("identifier is required"));
                 };
+
+                let volume_id = if let Some(identifier) = &package.metadata.identifier {
+                    identifier
+                        .split("/")
+                        .last()
+                        .and_then(|s| Some(s.trim_start_matches("vol_").trim_end_matches(".html")))
+                        .ok_or(anyhow::anyhow!("identifier is required"))?
+                        .to_string()
+                } else {
+                    return Err(anyhow::anyhow!("identifier is required"));
+                };
+
                 let mut updated_at = None;
                 let mut series = None;
                 let mut index = None;
@@ -90,6 +106,7 @@ pub fn build_index(path: &str) -> Result<Vec<Book>> {
                 }
 
                 let volume = Volume {
+                    id: volume_id,
                     title: package.metadata.title,
                     url_vol: package
                         .metadata
@@ -150,4 +167,14 @@ pub fn get_books(index_path: &str) -> Result<Vec<Book>> {
     let str = std::fs::read_to_string(index_path).unwrap();
     let books = serde_json::from_str(&str)?;
     Ok(books)
+}
+
+pub async fn get_last_update_by_with_volume(
+    client: &BiliClient,
+    book_id: &str,
+    volume_id: &str,
+) -> Result<String> {
+    let html = client.get_volume(book_id, volume_id, &None).await?;
+    let last_update = parse_last_update(&html).ok_or(anyhow::anyhow!("last_update is required"))?;
+    Ok(last_update)
 }

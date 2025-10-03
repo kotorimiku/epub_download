@@ -34,6 +34,7 @@ pub struct Book {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct Volume {
+    pub id: String,
     pub title: Option<String>,
     pub url_vol: String,
     pub volume_no: u32,

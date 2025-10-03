@@ -158,7 +158,20 @@ impl BiliClient {
         self.get_html(url.as_str(), message, 0).await
     }
 
-    pub async fn get_volume_catalog(&self, book_id: &str, message: &Option<App>) -> Result<String> {
+    pub async fn get_volume(
+        &self,
+        book_id: &str,
+        volume_id: &str,
+        message: &Option<App>,
+    ) -> Result<String> {
+        let url = self
+            .base_url
+            .join(&format!("/novel/{}/vol_{}.html", book_id, volume_id))?;
+
+        self.get_html(url.as_str(), message, 0).await
+    }
+
+    pub async fn get_catalog(&self, book_id: &str, message: &Option<App>) -> Result<String> {
         let url = self.base_url.join(&format!("/novel/{}/catalog", book_id))?;
 
         self.get_html(url.as_str(), message, 0).await

@@ -1,0 +1,138 @@
+name: "publish"
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  get-version:
+    runs-on: ubuntu-latest
+    outputs:
+      VERSION: ${{ steps.get_version.outputs.VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version number
+        id: get_version
+        run: |
+          VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+  get-product-name:
+    runs-on: ubuntu-latest
+    outputs:
+      PRODUCT_NAME: ${{ steps.get_product_name.outputs.PRODUCT_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get product name
+        id: get_product_name
+        run: |
+          PRODUCT_NAME=$(jq -r '.productName' src-tauri/tauri.conf.json)
+          echo "PRODUCT_NAME=$PRODUCT_NAME" >> $GITHUB_OUTPUT
+
+  publish-tauri:
+    needs: [get-version, get-product-name]
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+      PRODUCT_NAME: ${{ needs.get-product-name.outputs.PRODUCT_NAME }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            arch: "aarch64"
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-latest"
+            arch: "x86_64"
+            args: "--target x86_64-apple-darwin"
+          - platform: "ubuntu-22.04"
+            args: ""
+          - platform: "windows-latest"
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: install frontend dependencies
+        run: bun install
+
+      - name: build
+        uses: tauri-apps/tauri-action@v0
+        with:
+          args: ${{ matrix.args }}
+
+      - name: Create artifacts directory
+        run: mkdir -p artifacts
+
+      - name: Copy windows to release assets
+        if: matrix.platform == 'windows-latest'
+        run: |
+          cp src-tauri/target/release/bundle/nsis/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_x64-setup.exe artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_windows_x64-setup.exe
+          cp src-tauri/target/release/${{ env.PRODUCT_NAME }}.exe artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_windows_x64-portable.exe
+
+      - name: Copy linux to release assets
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          cp src-tauri/target/release/bundle/deb/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_amd64.deb artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_linux_amd64.deb
+          cp src-tauri/target/release/bundle/rpm/${{ env.PRODUCT_NAME }}-${{ env.VERSION }}-1.x86_64.rpm artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_linux_amd64.rpm
+          cp src-tauri/target/release/${{ env.PRODUCT_NAME }} artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_linux_amd64_portable
+
+      - name: Copy macos to release assets
+        if: matrix.platform == 'macos-latest'
+        env:
+          ARCH_ALIAS: ${{ matrix.arch == 'x86_64' && 'x64' || matrix.arch }}
+        run: |
+          cp src-tauri/target/${{ matrix.arch }}-apple-darwin/release/bundle/dmg/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_${{ env.ARCH_ALIAS }}.dmg artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_macos_${{ matrix.arch }}.dmg
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ matrix.platform }}-${{ matrix.arch || 'default' }}
+          path: artifacts/*
+
+  create-release:
+    needs: [ publish-tauri, get-version ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-assets-*
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: v${{ needs.get-version.outputs.VERSION }}
+          body: |
+            Take a look at the assets to download and install this app.
+          files: |
+            artifacts/*
+          draft: true
+          prerelease: false

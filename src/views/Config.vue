@@ -103,19 +103,9 @@
         <n-switch v-model:value="autoCheckUpdate" />
       </n-form-item>
 
-      <!-- 检测更新和 GitHub 按钮 -->
       <n-form-item>
-        <div class="flex gap-2 justify-center">
-          <n-button class="flex-1" @click="checkUpdate">检测更新</n-button>
-          <n-button
-            class="flex-1 flex items-center justify-center"
-            tag="a"
-            href="https://github.com/kotorimiku/epub_download"
-            target="_blank"
-          >
-            <n-icon size="20" class="mr-1"><GithubIcon /></n-icon>
-            GitHub
-          </n-button>
+        <div class="flex justify-center">
+          <n-button @click="showVersionDialog">关于</n-button>
         </div>
       </n-form-item>
 
@@ -126,6 +116,49 @@
         </n-button>
       </n-form-item>
     </n-form>
+
+    <!-- 版本信息对话框 -->
+    <n-modal v-model:show="showVersionModal">
+      <n-card
+        style="width: 400px"
+        title="版本信息"
+        :bordered="false"
+        size="huge"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="version-info">
+          <div class="version-item">
+            <span class="label">当前版本：</span>
+            <span class="value">{{ version || "获取中..." }}</span>
+          </div>
+          <div class="version-item">
+            <span class="label">应用名称：</span>
+            <span class="value">epub_download</span>
+          </div>
+        </div>
+
+        <!-- 对话框中的按钮区域 -->
+        <div class="dialog-actions">
+          <n-button class="action-btn" @click="checkUpdate">检测更新</n-button>
+          <n-button
+            class="action-btn"
+            tag="a"
+            href="https://github.com/kotorimiku/epub_download"
+            target="_blank"
+          >
+            <n-icon size="18" class="mr-1"><GithubIcon /></n-icon>
+            GitHub
+          </n-button>
+        </div>
+
+        <template #footer>
+          <div class="flex justify-end">
+            <n-button @click="showVersionModal = false">关闭</n-button>
+          </div>
+        </template>
+      </n-card>
+    </n-modal>
   </div>
 </template>
 
@@ -142,6 +175,9 @@ import {
   NInputNumber,
   NButton,
   NSwitch,
+  NModal,
+  NCard,
+  NIcon,
 } from "naive-ui";
 
 const runCommand = useRunCommand();
@@ -155,6 +191,8 @@ const userAgent = ref<string>("");
 const output = ref<string>("");
 const addCatalog = ref(false);
 const autoCheckUpdate = ref(true);
+const version = ref<string>("");
+const showVersionModal = ref(false);
 
 const templateTitle = `
 书籍标题：{{book_title}}
@@ -219,6 +257,10 @@ const checkUpdate = () => {
   });
 };
 
+const showVersionDialog = () => {
+  showVersionModal.value = true;
+};
+
 const GithubIcon = {
   render() {
     return h(
@@ -257,11 +299,61 @@ onMounted(() => {
           autoCheckUpdate.value = true;
         }
       }
-      if (cookie.value === "") {
-        notify.error({ content: "您还没配置cookie，请先配置 Cookie" });
-      }
     },
     errMsg: "获取配置失败",
   });
+
+  // 获取版本信息
+  runCommand({
+    command: commands.getVersion,
+    onSuccess: (ver: string) => {
+      version.value = `v${ver}`;
+    },
+    errMsg: "获取版本信息失败",
+  });
 });
 </script>
+
+<style scoped>
+.version-info {
+  padding: 16px 0;
+}
+
+.version-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.version-item:last-child {
+  border-bottom: none;
+}
+
+.label {
+  font-weight: 500;
+  color: #666;
+}
+
+.value {
+  font-weight: 600;
+  color: #333;
+}
+
+.dialog-actions {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>

@@ -204,3 +204,43 @@ pub fn parse_vol_desc(html: &str) -> Option<String> {
     }
     None
 }
+
+pub fn parse_last_update(novel_html: &str) -> Option<String> {
+    let document = Html::parse_document(&novel_html);
+    let a_selector = Selector::parse("a.book-meta.book-status").unwrap();
+    let div_selector = Selector::parse("div.book-meta-l").unwrap();
+    for element in document.select(&a_selector) {
+        for element in element.select(&div_selector) {
+            let mut direct_text = String::new();
+            for child in element.children() {
+                println!("child: {:?}", child.value());
+                if child.value().is_text() {
+                    direct_text.push_str(child.value().as_text().unwrap());
+                }
+            }
+            let cleaned_text = direct_text.trim();
+            if !cleaned_text.is_empty() {
+                return Some(cleaned_text.to_string());
+            }
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::client;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_parse_last_update() {
+        let html = client::BiliClient::new("https://www.bilinovel.com", "", "")
+            .unwrap()
+            .get_novel("1", &None)
+            .await
+            .unwrap();
+        let last_update = parse_last_update(&html);
+        println!("last_update: {:?}", last_update);
+    }
+}

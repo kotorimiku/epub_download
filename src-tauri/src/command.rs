@@ -140,6 +140,13 @@ pub async fn check_update() -> Result<String> {
 
 #[tauri::command]
 #[specta::specta]
+pub async fn get_version() -> Result<&'static str> {
+    let result = env!("CARGO_PKG_VERSION");
+    Ok(result)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn get_books() -> Result<Vec<Book>> {
     let books = crate::manage::get_books(crate::config::INDEX_FILE)?;
     Ok(books)

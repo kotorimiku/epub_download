@@ -28,6 +28,14 @@
     "icon": [
       "icons/logo.png",
       "icons/logo.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine",
+        "languages": [
+          "SimpChinese"
+        ]
+      }
+    }
   }
 }

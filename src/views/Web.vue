@@ -54,7 +54,14 @@ onMounted(() => {
     iframe
       .value!.contentDocument!.getElementById("acontent")!
       .querySelectorAll("*")
-      .forEach((el) => getComputedStyle(el).display === "none" && el.remove());
+      .forEach((el) => {
+        const style = getComputedStyle(el);
+        return (
+          (style.display === "none" ||
+            style.transform === "matrix(0, 0, 0, 0, 0, 0)") &&
+          el.remove()
+        );
+      });
 
     emit(
       "restoreHtml",
