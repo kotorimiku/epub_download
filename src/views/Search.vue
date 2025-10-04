@@ -8,7 +8,11 @@
         @keyup.enter="search"
       />
       <n-button type="primary" @click="search">搜索</n-button>
-      <n-button :disabled="!volumeList.length" @click="download" type="success">
+      <n-button
+        :disabled="!volumeList.length || globalStore.isDownloading"
+        @click="download"
+        type="success"
+      >
         开始下载
       </n-button>
       <n-button @click="cancelDownload">取消下载</n-button>
@@ -65,6 +69,7 @@ import { listen } from "@tauri-apps/api/event"; // 监听事件
 import { useRunCommand } from "../composables/RunCommand";
 import { commands } from "../bindings";
 import { SelectionArea, SelectionEvent, SelectionOptions } from "@viselect/vue";
+import { globalStore } from "@/store/global";
 
 const extractIds = (els: Element[]): number[] => {
   return els
@@ -97,7 +102,6 @@ selectedVolumes.value.add(1);
 const bookInfo = ref<any | null>(null);
 const volumeList = ref<any[]>([]); // 书籍卷列表
 const bookId = ref<string>(""); // 用户输入的书籍 ID
-const isDownloading = ref(false); // 是否正在下载
 
 // 滚动框引用
 const messageBox = ref<HTMLDivElement | null>(null);
@@ -119,7 +123,6 @@ const selectAll = () => {
   selectedVolumes.value = new Set<number>(
     Array.from({ length: volumeList.value.length }, (_, index) => index + 1)
   );
-  console.log(selectedVolumes.value);
 };
 
 // 反选
@@ -156,11 +159,11 @@ const search = async () => {
 
 // 下载选中卷
 const download = async () => {
-  if (selectedVolumes.value.size === 0 || isDownloading.value) {
+  if (selectedVolumes.value.size === 0 || globalStore.isDownloading) {
     return; // 没有选中卷，直接返回
   }
 
-  isDownloading.value = true;
+  globalStore.isDownloading = true;
 
   runCommand({
     command: () =>
@@ -178,9 +181,10 @@ const download = async () => {
       messages.value.push("下载失败，请重试！");
       scrollToBottom();
     },
+    onFinally: () => {
+      globalStore.isDownloading = false;
+    },
   });
-
-  isDownloading.value = false;
 };
 
 // 取消下载

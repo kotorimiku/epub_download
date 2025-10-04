@@ -117,6 +117,14 @@ pub async fn cancel_download(cancel_sender: State<'_, CancelSender>) -> Result<(
 
 #[tauri::command]
 #[specta::specta]
+pub async fn browser_url(url: String) -> Result<String> {
+    let client = crate::client::BiliClient::new("https://www.bilinovel.com", "", "")?;
+    let result = client.get(&url).await?;
+    Ok(result)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn save_config(config: State<'_, RwLock<Config>>, new_config: Config) -> Result<()> {
     let mut config = config.write();
     *config = new_config;

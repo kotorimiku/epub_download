@@ -2,10 +2,28 @@
 import { ref, onMounted } from "vue";
 import { restoreHtml } from "../composables/event";
 import { emit } from "@tauri-apps/api/event";
+import { useRunCommand } from "@/composables/RunCommand";
+import { commands } from "@/bindings";
+import { NInput, NButton } from "naive-ui";
+import { globalStore } from "@/store/global";
 
 const iframe = ref<HTMLIFrameElement | null>(null);
+const url = ref<string>("");
 
 let restore: void | (() => void) | null = null;
+
+const runCommand = useRunCommand();
+
+const getHtml = (url: string) => {
+  if (!url) return;
+  if (globalStore.isDownloading) return;
+  runCommand({
+    command: () => commands.browserUrl(url),
+    onSuccess: (result: any) => {
+      iframe.value!.srcdoc = result;
+    },
+  });
+};
 
 onMounted(() => {
   // 重写iframe的srcdoc属性，自动注入修改navigator.platform的脚本
@@ -50,17 +68,20 @@ onMounted(() => {
   });
 
   iframe.value!.onload = () => {
-    // 移除所有display: none的元素
     iframe
       .value!.contentDocument!.getElementById("acontent")!
       .querySelectorAll("*")
       .forEach((el) => {
         const style = getComputedStyle(el);
-        return (
-          (style.display === "none" ||
-            style.transform === "matrix(0, 0, 0, 0, 0, 0)") &&
-          el.remove()
-        );
+        if (
+          style.display === "none" ||
+          style.transform === "matrix(0, 0, 0, 0, 0, 0)" ||
+          style.position === "absolute"
+        ) {
+          console.log(el);
+          el.remove();
+        }
+        return;
       });
 
     emit(
@@ -80,11 +101,26 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="w-full h-full overflow-hidden">
+  <div class="w-full h-full overflow-hidden flex flex-col">
+    <div class="flex items-center gap-2 h-10 px-2">
+      <n-input
+        v-model:value="url"
+        placeholder="请输入URL"
+        class="w-full"
+        @keyup.enter="getHtml(url)"
+      />
+      <n-button
+        type="primary"
+        @click="getHtml(url)"
+        :disabled="globalStore.isDownloading"
+        >浏览</n-button
+      >
+    </div>
+
     <iframe
       ref="iframe"
       referrerpolicy="no-referrer"
-      class="w-full h-full border-none"
+      class="w-full h-full border-none flex-1"
     ></iframe>
   </div>
 </template>

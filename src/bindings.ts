@@ -29,6 +29,14 @@ async cancelDownload() : Promise<Result<null, CommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async browserUrl(url: string) : Promise<Result<string, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("browser_url", { url }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async saveConfig(newConfig: Config) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("save_config", { newConfig }) };

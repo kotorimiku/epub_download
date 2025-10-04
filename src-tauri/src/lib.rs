@@ -35,6 +35,7 @@ pub fn run() {
         get_book_info,
         download,
         cancel_download,
+        browser_url,
         save_config,
         get_config_vue,
         check_update,

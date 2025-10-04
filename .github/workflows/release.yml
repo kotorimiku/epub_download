@@ -96,7 +96,7 @@ jobs:
         run: |
           cp src-tauri/target/release/bundle/deb/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_amd64.deb artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_linux_amd64.deb
           cp src-tauri/target/release/bundle/rpm/${{ env.PRODUCT_NAME }}-${{ env.VERSION }}-1.x86_64.rpm artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_linux_amd64.rpm
-          cp src-tauri/target/release/${{ env.PRODUCT_NAME }} artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_linux_amd64_portable
+          cp src-tauri/target/release/${{ env.PRODUCT_NAME }} artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_linux_amd64
 
       - name: Copy macos to release assets
         if: matrix.platform == 'macos-latest'
