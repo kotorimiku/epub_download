@@ -33,8 +33,7 @@
 
 #### 前置要求
 
-- [Node.js](https://nodejs.org/) 18+
-- [Bun](https://bun.sh/) (推荐) 或 npm/pnpm/yarn
+- [Bun](https://bun.sh/) 或 [Node.js](https://nodejs.org/) 18+ (使用 npm/pnpm/yarn)
 - [Rust](https://www.rust-lang.org/) 1.70+
 - Tauri 依赖项（参见 [Tauri 前置要求](https://tauri.app/v1/guides/getting-started/prerequisites)）
 
