@@ -128,18 +128,18 @@ impl ParagraphRestorer {
 /// 使用示例和测试
 #[cfg(test)]
 mod tests {
-    use crate::{client, config, parse};
-
     use super::*;
+    use crate::{client, config, parse};
 
     #[tokio::test]
     async fn test_paragraph_restorer() {
-        let config = config::Config::new();
+        let config = config::Config::default();
 
         let client = client::BiliClient::new(
             config.base_url.as_str(),
             config.cookie.as_str(),
             config.user_agent.as_str(),
+            &config.headers,
         )
         .unwrap();
 

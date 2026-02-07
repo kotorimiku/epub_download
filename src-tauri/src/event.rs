@@ -1,5 +1,6 @@
-use anyhow::Result;
 use std::sync::{Arc, Mutex};
+
+use anyhow::Result;
 use tauri::{AppHandle, Emitter, Listener};
 
 pub fn message(app_handle: &AppHandle, msg: &str) {

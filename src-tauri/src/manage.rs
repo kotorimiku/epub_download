@@ -80,7 +80,7 @@ pub fn build_index(path: &str) -> Result<Vec<Book>> {
                     identifier
                         .split("/")
                         .last()
-                        .and_then(|s| Some(s.trim_start_matches("vol_").trim_end_matches(".html")))
+                        .map(|s| s.trim_start_matches("vol_").trim_end_matches(".html"))
                         .ok_or(anyhow::anyhow!("identifier is required"))?
                         .to_string()
                 } else {

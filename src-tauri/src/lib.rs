@@ -20,12 +20,13 @@ pub mod event;
 #[cfg(feature = "gui")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    use crate::command::*;
-    use crate::config::Config;
-    use parking_lot::RwLock;
     use std::sync::Arc;
-    use tauri_specta::{collect_commands, Builder};
+
+    use parking_lot::RwLock;
+    use tauri_specta::{Builder, collect_commands};
     use tokio::sync::broadcast;
+
+    use crate::{command::*, config::Config};
 
     // 创建取消通道
     let (cancel_sender, _) = broadcast::channel::<()>(1);

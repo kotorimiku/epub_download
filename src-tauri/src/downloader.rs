@@ -1,17 +1,36 @@
-use crate::client::*;
-use crate::epub_builder::{Body, ContentBlock, EpubBuilder, Metadata};
-use crate::message::{print, send};
-use crate::model::{App, BookInfo, Content, VolumeInfo};
-use crate::parse::{parse_metadata, parse_novel_text, parse_vol_desc, parse_volume_list};
-use crate::secret::decode_text;
-use crate::utils::remove_invalid_chars;
-use anyhow::{anyhow, Result};
+use std::{
+    collections::{HashMap, HashSet},
+    io::{self, Write},
+    path::{self, PathBuf, absolute},
+    thread::sleep,
+};
+
+use anyhow::{Result, anyhow};
 use regex::Regex;
-use std::collections::HashSet;
-use std::io::{self, Write};
-use std::path::PathBuf;
-use std::path::{self, absolute};
-use std::thread::sleep;
+
+use crate::{
+    client::*,
+    epub_builder::{Body, ContentBlock, EpubBuilder, Metadata, MetadataConfig},
+    message::{print, send},
+    model::{App, BookInfo, Content, VolumeInfo},
+    parse::{parse_metadata, parse_novel_text, parse_vol_desc, parse_volume_list},
+    secret::decode_text,
+    utils::remove_invalid_chars,
+};
+
+pub struct DownloaderConfig {
+    pub base_url: String,
+    pub book_id: String,
+    pub output: String,
+    pub template: String,
+    pub sleep_time: u32,
+    pub cookie: String,
+    pub user_agent: String,
+    pub header_map: HashMap<String, String>,
+    pub add_catalog: bool,
+    pub error_img: HashSet<String>,
+    pub app_handle: Option<tauri::AppHandle>,
+}
 
 pub struct Downloader {
     pub base_url: String,
@@ -48,66 +67,57 @@ async fn get_volume_list(
 }
 
 impl Downloader {
-    pub async fn new(
-        base_url: String,
-        book_id: String,
-        output: String,
-        template: String,
-        sleep_time: u32,
-        cookie: &str,
-        user_agent: &str,
-        add_catalog: bool,
-        error_img: HashSet<String>,
-        app_handle: Option<tauri::AppHandle>,
-    ) -> Result<Self> {
-        let client = BiliClient::new(&base_url, cookie, user_agent)?;
-        let book_info = get_metadata(&book_id, &client, &app_handle).await?;
+    pub async fn new(config: DownloaderConfig) -> Result<Self> {
+        let client = BiliClient::new(
+            &config.base_url,
+            &config.cookie,
+            &config.user_agent,
+            &config.header_map,
+        )?;
+        let book_info = get_metadata(&config.book_id, &client, &config.app_handle).await?;
         if book_info.title.is_none() {
             return Err(anyhow!("Book not found"));
         }
-        let volume_infos = get_volume_list(book_id.as_str(), &client, &app_handle).await?;
+        let volume_infos =
+            get_volume_list(config.book_id.as_str(), &client, &config.app_handle).await?;
         Ok(Self {
-            base_url,
-            book_id,
+            base_url: config.base_url,
+            book_id: config.book_id,
             client,
             book_info,
             volume_infos,
-            output,
-            template,
-            sleep_time,
-            add_catalog,
-            error_img,
-            app_handle,
+            output: config.output,
+            template: config.template,
+            sleep_time: config.sleep_time,
+            add_catalog: config.add_catalog,
+            error_img: config.error_img,
+            app_handle: config.app_handle,
         })
     }
 
     pub fn new_from(
-        base_url: String,
-        book_id: String,
-        output: String,
+        config: DownloaderConfig,
         book_info: BookInfo,
         volume_infos: Vec<VolumeInfo>,
-        template: String,
-        sleep_time: u32,
-        cookie: &str,
-        user_agent: &str,
-        add_catalog: bool,
-        error_img: HashSet<String>,
-        app_handle: Option<tauri::AppHandle>,
     ) -> Result<Self> {
-        let client = BiliClient::new(&base_url, cookie, user_agent)?;
+        let client = BiliClient::new(
+            &config.base_url,
+            &config.cookie,
+            &config.user_agent,
+            &config.header_map,
+        )?;
         Ok(Self {
-            base_url,
-            book_id,
+            base_url: config.base_url,
+            book_id: config.book_id,
             client,
             book_info,
             volume_infos,
-            output,
-            template,
-            sleep_time,
-            add_catalog,
-            error_img,
-            app_handle,
+            output: config.output,
+            template: config.template,
+            sleep_time: config.sleep_time,
+            add_catalog: config.add_catalog,
+            error_img: config.error_img,
+            app_handle: config.app_handle,
         })
     }
 
@@ -218,7 +228,7 @@ impl Downloader {
                 .filter(|content| !matches!(content, Content::Text(ref s) if s.is_empty()))
                 .filter(|content| !matches!(content, Content::Tag(ref s) if s.is_empty() || s.contains("<br")))
                 .collect::<Vec<_>>();
-            if filter.len() > 0 {
+            if !filter.is_empty() {
                 chapters_raw.insert(0, info);
                 volume.chapter_list.insert(0, "信息".to_string());
             }
@@ -237,8 +247,8 @@ impl Downloader {
 
         // 移除空章节
         let mut remove_list = Vec::new();
-        for i in 0..chapters.len() {
-            if chapters[i]
+        for (i, chapter) in chapters.iter().enumerate() {
+            if chapter
                 .iter()
                 .all(|cb| matches!(cb, ContentBlock::Text(s) if s.is_empty()))
             {
@@ -267,21 +277,24 @@ impl Downloader {
             .await?;
 
         //制作epub
-        let metadata = Metadata::new(
-            &format!(
-                "{}-{}",
-                self.book_info.title.clone().unwrap(),
-                volume.title.clone().unwrap()
-            ),
-            self.book_info.author.as_deref(),
-            self.book_info.publisher.as_deref(),
-            vol_desc.as_deref(),
-            self.book_info.title.as_deref(),
-            self.book_info.tags.clone(),
-            Some("zh-CN"),
-            Some(volume_no),
-            Some(&volume.url_vol.as_ref().unwrap().replace(&self.base_url, "")),
+        let title = format!(
+            "{}-{}",
+            self.book_info.title.as_ref().unwrap(),
+            volume.title.as_ref().unwrap()
         );
+        let identifier = volume.url_vol.as_ref().unwrap().replace(&self.base_url, "");
+        let metadata_config = MetadataConfig {
+            title: &title,
+            creator: self.book_info.author.as_deref(),
+            publisher: self.book_info.publisher.as_deref(),
+            description: vol_desc.as_deref(),
+            series: self.book_info.title.as_deref(),
+            subject: &self.book_info.tags,
+            language: Some("zh-CN"),
+            index: Some(volume_no),
+            identifier: Some(&identifier),
+        };
+        let metadata: Metadata = metadata_config.into();
         let epub_builder = EpubBuilder::new(
             metadata,
             Body::Blocks(chapters),
@@ -361,7 +374,7 @@ impl Downloader {
 
         send(&self.app_handle, "寻找章节链接失败");
         println!("{}", html);
-        return Err(anyhow!("寻找章节链接失败"));
+        Err(anyhow!("寻找章节链接失败"))
     }
 
     fn get_save_path(&self, volume_no: &str, title: &str) -> Result<PathBuf> {
@@ -377,8 +390,7 @@ impl Downloader {
         } else {
             template
         };
-        let dir_name =
-            remove_invalid_chars(&format!("{}", self.book_info.title.as_ref().unwrap(),));
+        let dir_name = remove_invalid_chars(&self.book_info.title.as_ref().unwrap().to_string());
 
         let re = Regex::new(r"\{\{chapter_number:(\d+)\}\}").unwrap();
         // 提取数字，格式化章节号
@@ -391,7 +403,7 @@ impl Downloader {
 
         let file_name = remove_invalid_chars(
             &result
-                .replace("{{book_title}}", &self.book_info.title.as_ref().unwrap())
+                .replace("{{book_title}}", self.book_info.title.as_ref().unwrap())
                 .replace("{{chapter_title}}", title)
                 .replace("{{volume_no}}", volume_no),
         );
@@ -402,8 +414,8 @@ impl Downloader {
 
     async fn download_img_list(
         &self,
-        img_url_list: &Vec<String>,
-        img_source_list: &Vec<String>,
+        img_url_list: &[String],
+        img_source_list: &[String],
     ) -> Result<Vec<Vec<u8>>> {
         send(&self.app_handle, "  正在下载插图");
 
@@ -458,7 +470,7 @@ impl Downloader {
     }
 
     fn get_ext(&self, url: &str) -> String {
-        let suffixes = vec!["jpg", "png", "jpeg"];
+        let suffixes = ["jpg", "png", "jpeg"];
         if suffixes.iter().any(|&suffix| url.ends_with(suffix)) {
             return path::Path::new(&url)
                 .extension()
@@ -466,7 +478,7 @@ impl Downloader {
                 .to_string_lossy()
                 .to_string();
         }
-        return String::from("jpg");
+        String::from("jpg")
     }
 
     fn get_chapters(
@@ -480,8 +492,8 @@ impl Downloader {
         for chapter_raw in chapters_raw {
             let mut chapter = Vec::new();
             let mut remove_list = Vec::new();
-            for i in 0..chapter_raw.len() {
-                match &chapter_raw[i] {
+            for (i, content) in chapter_raw.iter().enumerate() {
+                match content {
                     Content::Image(url) => {
                         let count = image_urls.iter().filter(|&x| x == url).count();
                         let index = image_urls.iter().position(|x| x == url).unwrap();
@@ -491,7 +503,7 @@ impl Downloader {
                             remove_list.push(i);
                         } else {
                             chapter.push(ContentBlock::Image(index));
-                            let ext = self.get_ext(&url);
+                            let ext = self.get_ext(url);
 
                             if url.starts_with("//") {
                                 image_urls[index] = format!("https:{}", url);
@@ -516,7 +528,7 @@ impl Downloader {
     ) -> Result<String> {
         let html = self
             .client
-            .get_html(&url, &self.app_handle, self.sleep_time)
+            .get_html(url, &self.app_handle, self.sleep_time)
             .await?;
         let html = crate::event::html(self.app_handle.as_ref().unwrap(), &html)?;
 
@@ -543,7 +555,7 @@ impl Downloader {
                     if text.contains("<br") || text.is_empty() {
                         continue;
                     }
-                    let new_text = decode_text(&text);
+                    let new_text = decode_text(text);
                     println!("解密前: {}", text);
                     println!("解密后: {}", new_text);
                     *text = new_text;
@@ -553,7 +565,7 @@ impl Downloader {
                     if tag.contains("<br") || tag.is_empty() {
                         continue;
                     }
-                    let new_tag = decode_text(&tag);
+                    let new_tag = decode_text(tag);
                     println!("解密前: {}", tag);
                     println!("解密后: {}", new_tag);
                     *tag = new_tag;

@@ -1,9 +1,13 @@
-use anyhow::{anyhow, Result};
+use std::{
+    collections::HashMap,
+    fs::{File, create_dir_all},
+    io::Write,
+    path::Path,
+};
+
+use anyhow::{Result, anyhow};
 use chrono::Utc;
-use std::fs::create_dir_all;
-use std::path::Path;
-use std::{collections::HashMap, fs::File, io::Write};
-use zip::{write::SimpleFileOptions, CompressionMethod};
+use zip::{CompressionMethod, write::SimpleFileOptions};
 
 #[derive(Default, Debug)]
 pub struct Metadata {
@@ -18,35 +22,42 @@ pub struct Metadata {
     pub identifier: Option<String>,
 }
 
-impl Metadata {
-    pub fn new(
-        title: &str,
-        creator: Option<&str>,
-        publisher: Option<&str>,
-        description: Option<&str>,
-        series: Option<&str>,
-        subject: Vec<String>,
-        language: Option<&str>,
-        index: Option<usize>,
-        identifier: Option<&str>,
-    ) -> Self {
-        let title = remove_invalid_xml_chars(&escape_epub_text(title));
-        let creator = creator.map(|c| remove_invalid_xml_chars(&escape_epub_text(c)));
-        let publisher = publisher.map(|p| remove_invalid_xml_chars(&escape_epub_text(p)));
-        let description = description.map(|d| remove_invalid_xml_chars(&escape_epub_text(d)));
-        let series = series.map(|s| remove_invalid_xml_chars(&escape_epub_text(s)));
-        let language = language.map(|l| remove_invalid_xml_chars(&escape_epub_text(l)));
-        let identifier = identifier.map(|i| remove_invalid_xml_chars(&escape_epub_text(i)));
+pub struct MetadataConfig<'a> {
+    pub title: &'a str,
+    pub creator: Option<&'a str>,
+    pub publisher: Option<&'a str>,
+    pub description: Option<&'a str>,
+    pub series: Option<&'a str>,
+    pub subject: &'a [String],
+    pub language: Option<&'a str>,
+    pub index: Option<usize>,
+    pub identifier: Option<&'a str>,
+}
+
+impl<'a> From<MetadataConfig<'a>> for Metadata {
+    fn from(config: MetadataConfig<'a>) -> Self {
         Self {
-            title,
-            creator,
-            publisher,
-            description,
-            series,
-            subject,
-            language,
-            index,
-            identifier,
+            title: remove_invalid_xml_chars(&escape_epub_text(config.title)),
+            creator: config
+                .creator
+                .map(|c| remove_invalid_xml_chars(&escape_epub_text(c))),
+            publisher: config
+                .publisher
+                .map(|p| remove_invalid_xml_chars(&escape_epub_text(p))),
+            description: config
+                .description
+                .map(|d| remove_invalid_xml_chars(&escape_epub_text(d))),
+            series: config
+                .series
+                .map(|s| remove_invalid_xml_chars(&escape_epub_text(s))),
+            subject: config.subject.to_vec(),
+            language: config
+                .language
+                .map(|l| remove_invalid_xml_chars(&escape_epub_text(l))),
+            index: config.index,
+            identifier: config
+                .identifier
+                .map(|i| remove_invalid_xml_chars(&escape_epub_text(i))),
         }
     }
 }
@@ -98,7 +109,9 @@ impl EpubBuilder {
                                     remove_invalid_xml_chars(&escape_epub_text(&text)),
                                 ),
                                 ContentBlock::Image(_) => block,
-                                ContentBlock::Tag(tag) => ContentBlock::Tag(remove_invalid_xml_chars(&tag)),
+                                ContentBlock::Tag(tag) => {
+                                    ContentBlock::Tag(remove_invalid_xml_chars(&tag))
+                                }
                             })
                             .collect()
                     })
@@ -150,9 +163,9 @@ impl EpubBuilder {
         );
         let html = match &self.chapters {
             Body::Html(html) => html,
-            Body::Blocks(blocks) => &self.to_html(&blocks),
+            Body::Blocks(blocks) => &self.to_html(blocks),
         };
-        for i in 0..html.len() {
+        for (i, _) in html.iter().enumerate() {
             epub.insert(
                 format!("OEBPS/Text/{}.xhtml", self.num_fill(i + 1)),
                 self.build_xhtml(&self.chapter_titles[i], &html[i])
@@ -177,9 +190,9 @@ impl EpubBuilder {
         epub
     }
 
-    fn to_html(&self, chapters: &Vec<Vec<ContentBlock>>) -> Vec<String> {
+    fn to_html(&self, chapters: &[Vec<ContentBlock>]) -> Vec<String> {
         chapters
-            .into_iter()
+            .iter()
             .map(|chapter| {
                 chapter
                     .iter()
@@ -230,7 +243,7 @@ impl EpubBuilder {
 
     fn create_dir(&self, dir: Option<&Path>) -> Result<()> {
         if let Some(dir) = dir {
-            if let Err(_) = create_dir_all(dir) {
+            if create_dir_all(dir).is_err() {
                 return Err(anyhow!("创建目录失败"));
             }
         }
@@ -268,12 +281,12 @@ impl EpubBuilder {
       <navLabel>
         <text>{}</text>
       </navLabel>
-      <content src="{}" />
+      <content src="Text/{}.xhtml" />
     </navPoint>"#,
                 i + 1,
                 i + 1,
                 self.chapter_titles[i],
-                format!("Text/{}.xhtml", self.num_fill(i + 1)),
+                self.num_fill(i + 1),
             ));
         }
         nav_map.join("\n    ")
@@ -305,14 +318,13 @@ impl EpubBuilder {
     }
 
     fn get_guide_xml(&self) -> String {
-        let mut guide = Vec::new();
-        guide.push("<reference href=\"Text/cover.xhtml\" title=\"Cover\" type=\"cover\"/>");
+        let guide = ["<reference href=\"Text/cover.xhtml\" title=\"Cover\" type=\"cover\"/>"];
         guide.join("\n    ")
     }
 
     fn get_spine_xml(&self) -> String {
         let mut spine = Vec::new();
-        spine.push(format!("<itemref idref=\"cover.xhtml\"/>"));
+        spine.push("<itemref idref=\"cover.xhtml\"/>".to_string());
         // 添加目录页
         // spine.push(format!("<itemref idref=\"nav.xhtml\"/>"));
         for i in 0..self.chapter_titles.len() {
@@ -326,10 +338,11 @@ impl EpubBuilder {
 
     fn get_manifest_xml(&self) -> String {
         let mut manifest = Vec::new();
-        manifest.push(format!("<item id=\"cover.xhtml\" href=\"Text/cover.xhtml\" media-type=\"application/xhtml+xml\"/>"));
-        manifest.push(format!(
+        manifest.push("<item id=\"cover.xhtml\" href=\"Text/cover.xhtml\" media-type=\"application/xhtml+xml\"/>".to_string());
+        manifest.push(
             "<item id=\"ncx\" href=\"toc.ncx\" media-type=\"application/x-dtbncx+xml\"/>"
-        ));
+                .to_string(),
+        );
 
         // text
         for i in 0..self.chapter_titles.len() {
@@ -587,15 +600,9 @@ pub fn escape_epub_text(input: &str) -> String {
         .replace(">", "&gt;")
 }
 
-fn remove_invalid_xml_chars(input: &str) -> String {
+pub fn remove_invalid_xml_chars(input: &str) -> String {
     input
         .chars()
-        .filter(|&c| match c as u32 {
-            0x9 | 0xA | 0xD => true,
-            0x20..=0xD7FF => true,
-            0xE000..=0xFFFD => true,
-            0x10000..=0x10FFFF => true,
-            _ => false,
-        })
+        .filter(|&c| matches!(c as u32, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF))
         .collect()
 }

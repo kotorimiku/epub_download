@@ -1,23 +1,43 @@
-use anyhow::anyhow;
-use anyhow::Result;
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, COOKIE, USER_AGENT};
-use reqwest::Client;
+use std::collections::HashMap;
+
+use anyhow::{Result, anyhow};
+use reqwest::{
+    Client,
+    header::{ACCEPT, ACCEPT_LANGUAGE, COOKIE, HeaderMap, HeaderName, HeaderValue, USER_AGENT},
+};
 use url::Url;
 
-use crate::message::send;
-use crate::model::App;
-use crate::utils;
-use crate::utils::t2s;
+use crate::{message::send, model::App, utils, utils::t2s};
 
-pub fn get_headers(referer: &str, mut cookie: &str, mut user_agent: &str) -> HeaderMap {
+pub fn get_headers(
+    referer: &str,
+    mut cookie: &str,
+    mut user_agent: &str,
+    header_map: &HashMap<String, String>,
+) -> Result<HeaderMap> {
+    // let header_map: HashMap<String, String> = HashMap::new();
+    let mut headers = HeaderMap::new();
+
+    if !header_map.is_empty() {
+        for (k, v) in header_map {
+            if let (Ok(name), Ok(value)) = (
+                HeaderName::from_bytes(k.as_bytes()),
+                HeaderValue::from_str(v),
+            ) {
+                headers.insert(name, value);
+            }
+        }
+
+        return Ok(headers);
+    }
+
     if cookie.is_empty() {
         cookie = "cf_clearance=MhyWh1HcQwVSfqQ0YuGDHdGQV7byVnrStRtUluyvW5A-1742750359-1.2.1.1-mjTA91HfTFNjK9av6_GY7SqPux3rniOzJiA..fTOkzzgLbr_sNQQCQkcZXXgi9Yo4ML_VHTOsqmt4WYXRFAWwVuTESUsupsJfkV9k6MamwEJcnUL5pvpcu2Vn0H2fQEdzenu8htt8qxXUAcA0GnTI95CLvND3tjbFVWGuMg6BEXZZ9gWKncAMNIM4Oajs4faI6YV3hvrOtZOL5NcWa25cyBXbQmRvyQWn5v1UH5xszIFZ87VRSotm9ehiXiiodXmyBzXlzZR48sa4uP2nfsPp1FFJIsCsGvr7m1XH2eD7zmqdY48qOQQjxzcRAJ8qZK27lx1mnn8n3Wmse54R6Q44j9XxmvWFurmV_xh3gmVW6XP01sTEp1Aua.8JRiqTPSm5xbicJKkM3pXkyUxnBMOBIGmUzw2MghJwV4SNps.2aw; jieqiVisitInfo=jieqiUserLogin%3D1747807212%2CjieqiUserId%3D220564; night=1; cf_chl_rc_m=1; cf_clearance=M5TuaQ_ycgp5WRpEeF3datJC1PXAbk2PFJIX1Q0JsMQ-1757599333-1.2.1.1-BQSxNonxHm4oItlzo9FeFiZE52V_3.NtLTFmX1EBQWkuYbrTmWcR.k_Un6T5Tsy2CgP9rTJNZDOb8xeQvUi4DG8HNVwS.F6.vb1fpa3y.k2OeeLQlURXeB4apx9xUVL57kYgE3wz2qHnYkjZ2ekVd9MkWF2tdrBVG14oTKkDMcQiK7Kp_XfPodu1G90NHiVyRm5pagD1my2LqIDiby8bnNftG0sPSj6n8hLF6OR5blJsDEjkeSlyluj4sRpruCRv"
     }
     if user_agent.is_empty() {
         user_agent = "Mozilla/5.0 (Linux; U; Android 4.0.2; en-us; Galaxy Nexus Build/ICL53F) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30";
     }
-    let mut headers = HeaderMap::new();
-    headers.insert(USER_AGENT, HeaderValue::from_str(user_agent).unwrap());
+    headers.insert(USER_AGENT, HeaderValue::from_str(user_agent.trim())?);
     headers.insert(
         ACCEPT_LANGUAGE,
         HeaderValue::from_static(
@@ -25,10 +45,10 @@ pub fn get_headers(referer: &str, mut cookie: &str, mut user_agent: &str) -> Hea
         ),
     );
     headers.insert(ACCEPT, HeaderValue::from_static(r"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"));
-    headers.insert(COOKIE, HeaderValue::from_str(cookie).unwrap());
+    headers.insert(COOKIE, HeaderValue::from_str(cookie.trim())?);
     headers.insert(
         "Referer",
-        HeaderValue::from_str(&(referer.to_string() + "/novel/4353/250879.html")).unwrap(),
+        HeaderValue::from_str(&(referer.to_string() + "/novel/4353/250879.html"))?,
     );
     headers.insert(
         "accept-encoding",
@@ -55,7 +75,8 @@ pub fn get_headers(referer: &str, mut cookie: &str, mut user_agent: &str) -> Hea
         "Referrer-Policy",
         HeaderValue::from_static("strict-origin-when-cross-origin"),
     );
-    headers
+
+    Ok(headers)
 }
 
 pub struct BiliClient {
@@ -64,8 +85,13 @@ pub struct BiliClient {
 }
 
 impl BiliClient {
-    pub fn new(referer: &str, cookie: &str, user_agent: &str) -> Result<Self> {
-        let headers = get_headers(referer, cookie, user_agent);
+    pub fn new(
+        referer: &str,
+        cookie: &str,
+        user_agent: &str,
+        header_map: &HashMap<String, String>,
+    ) -> Result<Self> {
+        let headers = get_headers(referer, cookie, user_agent, header_map)?;
         Ok(Self {
             client: Client::builder().default_headers(headers).build()?,
             base_url: Url::parse(referer)?,
@@ -74,9 +100,9 @@ impl BiliClient {
 
     pub async fn get(&self, url: &str) -> Result<String> {
         if let Ok(res) = self.client.get(url).send().await {
-            return res.text().await.map_err(|e| anyhow!(e));
+            res.text().await.map_err(|e| anyhow!(e))
         } else {
-            return Err(anyhow!("请求失败"));
+            Err(anyhow!("请求失败"))
         }
     }
 
@@ -210,7 +236,7 @@ impl BiliClient {
                 }
             };
         }
-        return Err(anyhow!("插图下载失败"));
+        Err(anyhow!("插图下载失败"))
     }
 
     pub async fn check_update(&self) -> Result<String> {
@@ -239,7 +265,7 @@ mod tests {
 
     #[tokio::test]
     async fn download_test() {
-        let client = BiliClient::new("https://www.bilinovel.com", "", "");
+        let client = BiliClient::new("https://www.bilinovel.com", "", "", &HashMap::new());
         let result = client
             .unwrap()
             .get("https://www.bilinovel.com/novel/115/catalog")

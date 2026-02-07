@@ -1,0 +1,10 @@
+# unstable options
+unstable_features = true
+style_edition = "2024"
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+reorder_impl_items = true
+
+# stable options
+newline_style = "Unix"
+use_field_init_shorthand = true

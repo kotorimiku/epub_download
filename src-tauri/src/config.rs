@@ -1,7 +1,10 @@
+use std::{
+    collections::{HashMap, HashSet},
+    fs::{read_to_string, write},
+};
+
 use anyhow::Result;
 use specta::Type;
-use std::collections::HashSet;
-use std::fs::{read_to_string, write};
 
 const CONFIG_FILE: &str = "./config.json";
 pub const INDEX_FILE: &str = "./index.json";
@@ -17,6 +20,8 @@ pub struct Config {
     pub cookie: String,
     #[serde(default = "default_user_agent")]
     pub user_agent: String,
+    #[serde(default)]
+    pub headers: HashMap<String, String>,
     #[serde(default = "default_sleep_time")]
     pub sleep_time: u32,
     #[serde(default = "default_base_url")]
@@ -29,13 +34,14 @@ pub struct Config {
     pub auto_check_update: bool,
 }
 
-impl Config {
-    pub fn new() -> Config {
+impl Default for Config {
+    fn default() -> Self {
         Config {
             output: String::from("./"),
             template: "{{book_title}}-{{chapter_title}}".to_string(),
             cookie: String::from(""),
             user_agent: String::from(""),
+            headers: HashMap::new(),
             sleep_time: 8,
             base_url: String::from("https://www.bilinovel.com"),
             add_catalog: false,
@@ -43,7 +49,9 @@ impl Config {
             auto_check_update: true,
         }
     }
+}
 
+impl Config {
     pub fn save(&self) -> Result<()> {
         write(CONFIG_FILE, serde_json::to_string_pretty(self)?)?;
         Ok(())
@@ -53,10 +61,7 @@ impl Config {
         read_to_string(CONFIG_FILE)
             .ok()
             .and_then(|content| serde_json::from_str(&content).ok())
-            .unwrap_or_else(|| {
-                let config = Config::new();
-                config
-            })
+            .unwrap_or_default()
     }
 }
 

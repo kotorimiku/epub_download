@@ -1,11 +1,15 @@
-use crate::config::Config;
-use crate::downloader::Downloader;
-use crate::error::Result;
-use crate::model::{Book, BookInfo, VolumeInfo};
+use std::{collections::HashMap, sync::Arc};
+
 use parking_lot::RwLock;
-use std::sync::Arc;
 use tauri::{AppHandle, State};
 use tokio::sync::broadcast;
+
+use crate::{
+    config::Config,
+    downloader::{Downloader, DownloaderConfig},
+    error::Result,
+    model::{Book, BookInfo, VolumeInfo},
+};
 
 // 全局取消通道类型
 pub type CancelSender = Arc<broadcast::Sender<()>>;
@@ -17,7 +21,17 @@ pub async fn get_book_info(
     app: AppHandle,
     book_id: String,
 ) -> Result<(BookInfo, Vec<VolumeInfo>)> {
-    let (base_url, output, template, sleep_time, cookie, user_agent, add_catalog, error_img) = {
+    let (
+        base_url,
+        output,
+        template,
+        sleep_time,
+        cookie,
+        user_agent,
+        header_map,
+        add_catalog,
+        error_img,
+    ) = {
         let config = config.read();
 
         (
@@ -27,24 +41,27 @@ pub async fn get_book_info(
             config.sleep_time,
             config.cookie.clone(),
             config.user_agent.clone(),
+            config.headers.clone(),
             config.add_catalog,
             config.error_img.clone(),
         )
     }; // config 在这里自动 drop 释放锁
 
-    let result = Downloader::new(
+    let downloader_config = DownloaderConfig {
         base_url,
-        book_id,
+        book_id: book_id.clone(),
         output,
         template,
         sleep_time,
-        &cookie,
-        &user_agent,
+        cookie,
+        user_agent,
+        header_map,
         add_catalog,
         error_img,
-        Some(app),
-    )
-    .await?;
+        app_handle: Some(app),
+    };
+
+    let result = Downloader::new(downloader_config).await?;
 
     let result = (result.book_info, result.volume_infos);
 
@@ -62,7 +79,17 @@ pub async fn download(
     volume_list: Vec<VolumeInfo>,
     volume_no_list: Vec<u32>,
 ) -> Result<()> {
-    let (base_url, output, template, sleep_time, cookie, user_agent, add_catalog, error_img) = {
+    let (
+        base_url,
+        output,
+        template,
+        sleep_time,
+        cookie,
+        user_agent,
+        header_map,
+        add_catalog,
+        error_img,
+    ) = {
         let config = config.read();
         (
             config.base_url.clone(),
@@ -71,6 +98,7 @@ pub async fn download(
             config.sleep_time,
             config.cookie.clone(),
             config.user_agent.clone(),
+            config.headers.clone(),
             config.add_catalog,
             config.error_img.clone(),
         )
@@ -82,20 +110,20 @@ pub async fn download(
     // 使用 tokio::select! 来处理下载任务和取消信号
     tokio::select! {
         result = async {
-            let downloader = Downloader::new_from(
+            let downloader_config = DownloaderConfig {
                 base_url,
                 book_id,
                 output,
-                book_info,
-                volume_list,
                 template,
                 sleep_time,
-                &cookie,
-                &user_agent,
+                cookie,
+                user_agent,
+                header_map,
                 add_catalog,
                 error_img,
-                Some(app),
-            )?;
+                app_handle: Some(app),
+            };
+            let downloader = Downloader::new_from(downloader_config, book_info, volume_list)?;
             downloader.download(volume_no_list.into_iter()).await
         } => {
             result?;
@@ -117,8 +145,17 @@ pub async fn cancel_download(cancel_sender: State<'_, CancelSender>) -> Result<(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn browser_url(url: String) -> Result<String> {
-    let client = crate::client::BiliClient::new("https://www.bilinovel.com", "", "")?;
+pub async fn browser_url(url: String, config: State<'_, RwLock<Config>>) -> Result<String> {
+    let (base_url, cookie, user_agent, header_map) = {
+        let config = config.read();
+        (
+            config.base_url.clone(),
+            config.cookie.clone(),
+            config.user_agent.clone(),
+            config.headers.clone(),
+        )
+    };
+    let client = crate::client::BiliClient::new(&base_url, &cookie, &user_agent, &header_map)?;
     let result = client.get(&url).await?;
     Ok(result)
 }
@@ -141,7 +178,8 @@ pub async fn get_config_vue(config: State<'_, RwLock<Config>>) -> Result<Config>
 #[tauri::command]
 #[specta::specta]
 pub async fn check_update() -> Result<String> {
-    let client = crate::client::BiliClient::new("https://www.bilinovel.com", "", "")?;
+    let client =
+        crate::client::BiliClient::new("https://www.bilinovel.com", "", "", &HashMap::new())?;
     let result = client.check_update().await?;
     Ok(result)
 }

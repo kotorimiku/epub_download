@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::sync::OnceLock;
+use std::{collections::HashMap, sync::OnceLock};
 
 #[cfg(test)]
 mod tests {
@@ -23,7 +22,7 @@ mod tests {
 static SECRET_MAP: OnceLock<HashMap<String, String>> = OnceLock::new();
 
 pub fn get_secret_map() -> &'static HashMap<String, String> {
-    SECRET_MAP.get_or_init(|| get_secret_map_())
+    SECRET_MAP.get_or_init(get_secret_map_)
 }
 
 pub fn decode_text(str: &str) -> String {

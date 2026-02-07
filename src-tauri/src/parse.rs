@@ -58,9 +58,8 @@ pub fn parse_metadata(html: &str) -> BookInfo {
             }
         }
     }
-    for element in document.select(&content_selector) {
+    if let Some(element) = document.select(&content_selector).next() {
         description = Some(element.text().collect::<String>());
-        break;
     }
     BookInfo {
         title,
@@ -134,7 +133,7 @@ pub fn parse_novel_text(
     img_list: &mut Vec<String>,
     _url_base: &str,
 ) {
-    let document = Html::parse_document(&html);
+    let document = Html::parse_document(html);
     let div_selector = Selector::parse("div").unwrap();
 
     for element in document.select(&div_selector) {
@@ -155,9 +154,8 @@ pub fn parse_novel_text(
                             text.push(Content::Image(img.clone()));
                             img_list.push(img);
                         }
-                    } else if child.value().name().len() > 1 && child.value().name().contains("p") {
-                        continue;
-                    } else if child.value().name() == "div" && child.value().attr("class").is_some()
+                    } else if (child.value().name().len() > 1 && child.value().name().contains("p"))
+                        || (child.value().name() == "div" && child.value().attr("class").is_some())
                     {
                         continue;
                     } else {
@@ -171,7 +169,7 @@ pub fn parse_novel_text(
                         let raw_text = child.text();
                         let mut texts = HashMap::new();
                         for text in raw_text {
-                            texts.insert(text, utils::escape_epub_text(&text.trim()));
+                            texts.insert(text, utils::escape_epub_text(text.trim()));
                         }
 
                         let mut html = child.html();
@@ -196,9 +194,9 @@ pub fn parse_novel_text(
 }
 
 pub fn parse_vol_desc(html: &str) -> Option<String> {
-    let document = Html::parse_document(&html);
+    let document = Html::parse_document(html);
     let content_selector = Selector::parse("content").unwrap();
-    for element in document.select(&content_selector) {
+    if let Some(element) = document.select(&content_selector).next() {
         let description = Some(element.text().collect::<String>());
         return description;
     }
@@ -206,7 +204,7 @@ pub fn parse_vol_desc(html: &str) -> Option<String> {
 }
 
 pub fn parse_last_update(novel_html: &str) -> Option<String> {
-    let document = Html::parse_document(&novel_html);
+    let document = Html::parse_document(novel_html);
     let a_selector = Selector::parse("a.book-meta.book-status").unwrap();
     let div_selector = Selector::parse("div.book-meta-l").unwrap();
     for element in document.select(&a_selector) {
@@ -229,13 +227,12 @@ pub fn parse_last_update(novel_html: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::client;
-
     use super::*;
+    use crate::client;
 
     #[tokio::test]
     async fn test_parse_last_update() {
-        let html = client::BiliClient::new("https://www.bilinovel.com", "", "")
+        let html = client::BiliClient::new("https://www.bilinovel.com", "", "", &HashMap::new())
             .unwrap()
             .get_novel("1", &None)
             .await
