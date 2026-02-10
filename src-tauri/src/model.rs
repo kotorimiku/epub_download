@@ -1,7 +1,7 @@
 use serde::{self, Deserialize, Serialize};
-use specta::Type;
 
-#[derive(Debug, Serialize, Deserialize, Type)]
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "gui", derive(specta::Type))]
 pub struct BookInfo {
     pub title: Option<String>,
     pub author: Option<String>,
@@ -11,7 +11,8 @@ pub struct BookInfo {
     pub cover: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "gui", derive(specta::Type))]
 pub struct VolumeInfo {
     pub title: Option<String>,
     pub chapter_list: Vec<String>,
@@ -21,7 +22,8 @@ pub struct VolumeInfo {
     pub cover: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "gui", derive(specta::Type))]
 pub struct Book {
     pub id: String,
     pub title: Option<String>,
@@ -32,7 +34,8 @@ pub struct Book {
     pub volume_list: Vec<Volume>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "gui", derive(specta::Type))]
 pub struct Volume {
     pub id: String,
     pub title: Option<String>,

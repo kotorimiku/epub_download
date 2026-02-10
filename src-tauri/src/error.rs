@@ -1,6 +1,5 @@
-use specta::Type;
-
-#[derive(Debug, serde::Serialize, Type)]
+#[derive(Debug, serde::Serialize)]
+#[cfg_attr(feature = "gui", derive(specta::Type))]
 pub struct CommandError(pub String);
 
 impl<E> From<E> for CommandError

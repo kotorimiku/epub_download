@@ -4,13 +4,13 @@ use std::{
 };
 
 use anyhow::Result;
-use specta::Type;
 
 const CONFIG_FILE: &str = "./config.json";
 pub const INDEX_FILE: &str = "./index.json";
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Type)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "gui", derive(specta::Type))]
 pub struct Config {
     #[serde(default = "default_output")]
     pub output: String,

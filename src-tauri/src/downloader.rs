@@ -29,7 +29,7 @@ pub struct DownloaderConfig {
     pub header_map: HashMap<String, String>,
     pub add_catalog: bool,
     pub error_img: HashSet<String>,
-    pub app_handle: Option<tauri::AppHandle>,
+    pub app_handle: Option<App>,
 }
 
 pub struct Downloader {
@@ -43,7 +43,7 @@ pub struct Downloader {
     pub sleep_time: u32,
     pub add_catalog: bool,
     pub error_img: HashSet<String>,
-    pub app_handle: Option<tauri::AppHandle>,
+    pub app_handle: Option<App>,
 }
 
 async fn get_metadata(
@@ -530,6 +530,8 @@ impl Downloader {
             .client
             .get_html(url, &self.app_handle, self.sleep_time)
             .await?;
+
+        #[cfg(feature = "gui")]
         let html = crate::event::html(self.app_handle.as_ref().unwrap(), &html)?;
 
         let mut chapter = Vec::new();
@@ -581,6 +583,8 @@ impl Downloader {
                 .client
                 .get_html(&current_url, &self.app_handle, self.sleep_time)
                 .await?;
+
+            #[cfg(feature = "gui")]
             let html = crate::event::html(self.app_handle.as_ref().unwrap(), &html)?;
 
             let mut chapter = Vec::new();
