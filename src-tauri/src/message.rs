@@ -15,7 +15,7 @@ pub fn print(_app: Option<&App>, msg: &str) {
     #[cfg(feature = "gui")]
     {
         if let Some(app) = _app {
-            crate::event::message(app, msg);
+            crate::event::print(app, msg);
         }
     }
 

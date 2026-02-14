@@ -9,8 +9,9 @@ import { globalStore } from "@/store/global";
 
 const iframe = ref<HTMLIFrameElement | null>(null);
 const url = ref<string>("");
+const pendingRequestId = ref<string>("");
 
-let restore: void | (() => void) | null = null;
+let restore: (() => void) | null = null;
 
 const runCommand = useRunCommand();
 
@@ -25,11 +26,85 @@ const getHtml = (url: string) => {
   });
 };
 
-onMounted(() => {
+onMounted(async () => {
+  const waitForAcontentRestored = async (doc: Document): Promise<void> => {
+    const target = doc.getElementById("acontent");
+    if (!target) return;
+
+    const maxWaitMs = 4000;
+    const settleQuietMs = 220;
+    const minObserveAfterContentMs = 400;
+    const hasRestoreMarker = () => target.querySelector("p[data-k]") !== null;
+    const hasVisibleContent = () => {
+      const text = target.textContent?.trim() ?? "";
+      return text.length > 20;
+    };
+
+    if (hasRestoreMarker()) return;
+
+    await new Promise<void>((resolve) => {
+      let resolved = false;
+      let lastMutationAt = Date.now();
+      let contentSeenAt: number | null = hasVisibleContent()
+        ? Date.now()
+        : null;
+
+      const shouldFinish = () => {
+        if (hasRestoreMarker()) return true;
+        if (contentSeenAt === null) return false;
+
+        const now = Date.now();
+        const observedEnough = now - contentSeenAt >= minObserveAfterContentMs;
+        const quietEnough = now - lastMutationAt >= settleQuietMs;
+        return observedEnough && quietEnough;
+      };
+
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
+        observer.disconnect();
+        window.clearInterval(probeTimer);
+        window.clearTimeout(timeoutTimer);
+        resolve();
+      };
+
+      const observer = new MutationObserver(() => {
+        lastMutationAt = Date.now();
+        if (contentSeenAt === null && hasVisibleContent()) {
+          contentSeenAt = Date.now();
+        }
+
+        if (shouldFinish()) {
+          finish();
+        }
+      });
+
+      observer.observe(target, {
+        attributes: true,
+        attributeFilter: ["data-k"],
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+
+      const probeTimer = window.setInterval(() => {
+        if (contentSeenAt === null && hasVisibleContent()) {
+          contentSeenAt = Date.now();
+        }
+
+        if (shouldFinish()) {
+          finish();
+        }
+      }, 80);
+
+      const timeoutTimer = window.setTimeout(finish, maxWaitMs);
+    });
+  };
+
   // 重写iframe的srcdoc属性，自动注入修改navigator.platform的脚本
   const originalSrcdocDescriptor = Object.getOwnPropertyDescriptor(
     HTMLIFrameElement.prototype,
-    "srcdoc"
+    "srcdoc",
   );
 
   Object.defineProperty(iframe.value!, "srcdoc", {
@@ -51,7 +126,7 @@ onMounted(() => {
       } else if (html.includes("<html>")) {
         modifiedHtml = html.replace(
           "<html>",
-          `<html><head>${scriptTag}</head>`
+          `<html><head>${scriptTag}</head>`,
         );
       } else {
         modifiedHtml = `<html><head>${scriptTag}</head><body>${html}</body></html>`;
@@ -67,10 +142,20 @@ onMounted(() => {
     enumerable: true,
   });
 
-  iframe.value!.onload = () => {
-    iframe
-      .value!.contentDocument!.getElementById("acontent")!
-      .querySelectorAll("*")
+  iframe.value!.onload = async () => {
+    const doc = iframe.value?.contentDocument;
+    if (!doc) return;
+
+    const win = doc.defaultView;
+    win?.dispatchEvent(new Event("scroll"));
+    win?.dispatchEvent(new Event("wheel"));
+    doc.dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown" }));
+
+    await waitForAcontentRestored(doc);
+
+    doc
+      .getElementById("acontent")
+      ?.querySelectorAll("*")
       .forEach((el) => {
         const style = getComputedStyle(el);
         if (
@@ -78,19 +163,22 @@ onMounted(() => {
           style.transform === "matrix(0, 0, 0, 0, 0, 0)" ||
           style.position === "absolute"
         ) {
-          console.log(el);
           el.remove();
         }
         return;
       });
 
-    emit(
-      "restoreHtml",
-      iframe.value?.contentDocument?.documentElement?.outerHTML
-    );
+    if (!pendingRequestId.value) return;
+
+    await emit("restoreHtml", {
+      requestId: pendingRequestId.value,
+      html: doc.documentElement?.outerHTML ?? "",
+    });
+    pendingRequestId.value = "";
   };
 
-  restore = restoreHtml((html) => {
+  restore = await restoreHtml(({ requestId, html }) => {
+    pendingRequestId.value = requestId;
     iframe.value!.srcdoc = html;
   });
 });

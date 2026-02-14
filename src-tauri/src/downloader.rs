@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     io::{self, Write},
     path::{self, PathBuf, absolute},
@@ -14,6 +15,7 @@ use crate::{
     message::{print, send},
     model::{App, BookInfo, Content, VolumeInfo},
     parse::{parse_metadata, parse_novel_text, parse_vol_desc, parse_volume_list},
+    runtime::{RUN_MODE, RunMode},
     secret::decode_text,
     utils::remove_invalid_chars,
 };
@@ -545,11 +547,6 @@ impl Downloader {
 
         let chapter = self.paragraph_restorer(&html, img_list, url)?;
 
-        // let chapter_id = url.split("/").last().unwrap().split(".").next().unwrap().split("_").next().unwrap().parse::<u64>().unwrap();
-
-        // let restorer = ParagraphRestorer::new(chapter_id);
-        // let chapter = restorer.restore(chapter);
-
         chapter_text.extend(chapter);
 
         // 文本解密
@@ -601,11 +598,24 @@ impl Downloader {
         img_list: &mut Vec<String>,
         _url: &str,
     ) -> Result<Vec<Content>> {
-        #[cfg(feature = "gui")]
-        let html = &crate::event::html(self.app_handle.as_ref().unwrap(), html)?;
+        // #[cfg(feature = "gui")]
+        // let html = &crate::event::html(self.app_handle.as_ref().unwrap(), html)?;
+
+        let html = match *RUN_MODE.lock() {
+            RunMode::Gui => {
+                #[cfg(feature = "gui")]
+                {
+                    Cow::Owned(crate::event::html(self.app_handle.as_ref().unwrap(), html)?)
+                }
+
+                #[cfg(not(feature = "gui"))]
+                return Err(anyhow!("当前构建未启用 gui feature"));
+            }
+            RunMode::Cli => Cow::Borrowed(html),
+        };
 
         let mut chapter = Vec::new();
-        parse_novel_text(html, &mut chapter, img_list, &self.base_url);
+        parse_novel_text(html.as_ref(), &mut chapter, img_list, &self.base_url);
 
         if chapter.is_empty() {
             send(self.app_handle.as_ref(), "   章节内容为空");
@@ -613,36 +623,38 @@ impl Downloader {
             return Err(anyhow!("Chapter text is empty"));
         }
 
-        #[cfg(not(feature = "gui"))]
-        let chapter = {
-            use crate::paragraph_restorer::ParagraphRestorer;
-            if Self::_get_chapterlog_version(html)? != ParagraphRestorer::get_version() {
-                return Err(anyhow!("章节日志版本不匹配，无法恢复章节顺序"));
-            }
-            let chapter_id = _url
-                .split("/")
-                .last()
-                .unwrap()
-                .split(".")
-                .next()
-                .unwrap()
-                .split("_")
-                .next()
-                .unwrap()
-                .parse::<u64>()
-                .unwrap();
+        let chapter = match *RUN_MODE.lock() {
+            RunMode::Gui => chapter,
+            RunMode::Cli => {
+                use crate::paragraph_restorer::ParagraphRestorer;
+                if Self::get_chapterlog_version(html.as_ref())? != ParagraphRestorer::get_version()
+                {
+                    return Err(anyhow!("章节日志版本不匹配，无法恢复章节顺序"));
+                }
+                let chapter_id = _url
+                    .split("/")
+                    .last()
+                    .unwrap()
+                    .split(".")
+                    .next()
+                    .unwrap()
+                    .split("_")
+                    .next()
+                    .unwrap()
+                    .parse::<u64>()
+                    .unwrap();
 
-            let restorer = ParagraphRestorer::new(chapter_id);
-            restorer.restore(chapter)
+                let restorer = ParagraphRestorer::new(chapter_id);
+                restorer.restore(chapter)
+            }
         };
 
         Ok(chapter)
     }
 
-    fn _get_chapterlog_version(html: &str) -> Result<String> {
+    fn get_chapterlog_version(html: &str) -> Result<String> {
         let re = Regex::new(r"chapterlog\.js\?v([\w.]+)").unwrap();
         if let Some(captures) = re.captures(html) {
-            println!("chapterlog.js version: {:?}", &captures);
             if let Some(version) = captures.get(0) {
                 return Ok(version.as_str().to_string());
             }
@@ -672,7 +684,7 @@ mod tests {
             .get("https://www.bilinovel.com/novel/1/108523.html")
             .await
             .unwrap();
-        let version = Downloader::_get_chapterlog_version(&html).unwrap();
+        let version = Downloader::get_chapterlog_version(&html).unwrap();
         println!("version: {}", version);
     }
 }

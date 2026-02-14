@@ -38,7 +38,12 @@
       <n-card class="volume w-1/3 overflow-y-auto">
         <selection-area
           class="container"
-          :options="{ selectables: '.selectable', boundaries: '.volume' } as SelectionOptions"
+          :options="
+            {
+              selectables: '.selectable',
+              boundaries: '.volume',
+            } as SelectionOptions
+          "
           :onMove="onMove"
           :onStart="onStart"
         >
@@ -112,7 +117,7 @@ listen("message", (event) => {
   scrollToBottom(); // 滚动到最新消息
 });
 
-listen("image", (event) => {
+listen("print", (event) => {
   messages.value.pop();
   messages.value.push(event.payload as string);
   scrollToBottom(); // 滚动到最新消息
@@ -121,7 +126,7 @@ listen("image", (event) => {
 // 全选
 const selectAll = () => {
   selectedVolumes.value = new Set<number>(
-    Array.from({ length: volumeList.value.length }, (_, index) => index + 1)
+    Array.from({ length: volumeList.value.length }, (_, index) => index + 1),
   );
 };
 
@@ -130,7 +135,7 @@ const selectInverse = () => {
   selectedVolumes.value = new Set(
     volumeList.value
       .map((_, index) => index + 1)
-      .filter((_, index) => !selectedVolumes.value.has(index + 1))
+      .filter((_, index) => !selectedVolumes.value.has(index + 1)),
   );
 };
 
@@ -171,7 +176,7 @@ const download = async () => {
         bookId.value.trim(),
         bookInfo.value,
         volumeList.value,
-        Array.from(selectedVolumes.value)
+        Array.from(selectedVolumes.value),
       ),
     onSuccess: () => {
       messages.value.push(`下载任务完成！`);

@@ -100,7 +100,7 @@ async createIndex() : Promise<Result<null, CommandError>> {
 export type Book = { id: string; title: string | null; author: string | null; publisher: string | null; tags: string[]; description: string | null; volume_list: Volume[] }
 export type BookInfo = { title: string | null; author: string | null; publisher: string | null; tags: string[]; description: string | null; cover: string | null }
 export type CommandError = string
-export type Config = { output?: string; template?: string; cookie?: string; userAgent?: string; headers?: Partial<{ [key in string]: string }>; sleepTime?: number; baseUrl?: string; addCatalog?: boolean; errorImg?: string[]; autoCheckUpdate?: boolean }
+export type Config = { output?: string; template?: string; cookie?: string; userAgent?: string; headers?: Partial<{ [key in string]: string }>; sleepTime?: number; baseUrl?: string; addCatalog?: boolean; errorImg?: string[]; autoCheckUpdate?: boolean; convertSimpleChinese?: boolean }
 export type Volume = { id: string; title: string | null; url_vol: string; volume_no: number; updated_at: string; path: string }
 export type VolumeInfo = { title: string | null; chapter_list: string[]; chapter_path_list: string[]; url_vol: string | null; volume_no: number; cover: string | null }
 

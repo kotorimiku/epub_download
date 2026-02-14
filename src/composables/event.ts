@@ -1,7 +1,12 @@
-import { listen, emit } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
 
-export function restoreHtml(callback: (html: string) => void) {
-  listen('html', (event) => {
-    callback(event.payload as string);
+type HtmlEventPayload = {
+  requestId: string;
+  html: string;
+};
+
+export function restoreHtml(callback: (payload: HtmlEventPayload) => void) {
+  return listen('html', (event) => {
+    callback(event.payload as HtmlEventPayload);
   });
 }
