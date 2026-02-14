@@ -7,7 +7,7 @@ pub struct ParagraphRestorer {
 
 impl ParagraphRestorer {
     pub fn get_version() -> &'static str {
-        "chapterlog.js?v1006a8"
+        "chapterlog.js?v1006c1.3"
     }
 
     /// 创建新的段落恢复器
@@ -18,11 +18,16 @@ impl ParagraphRestorer {
         Self { chapter_id }
     }
 
+    /// 生成种子值
+    pub fn generate_seed(chapter_id: u64) -> u64 {
+        (chapter_id * 0x7e) + 0xe8
+    }
+
     /// 从字符串列表中恢复正确顺序
     ///
     /// 实现与JavaScript相同的逻辑：
-    /// - 如果段落数量 <= 19，保持原顺序
-    /// - 如果段落数量 > 19，前19个保持原顺序，后面的需要恢复
+    /// - 如果段落数量 <= 20，保持原顺序
+    /// - 如果段落数量 > 20，前20个保持原顺序，后面的需要恢复
     ///
     /// # 参数
     /// * `paragraphs` - 混乱的段落列表
@@ -36,18 +41,18 @@ impl ParagraphRestorer {
 
         let text_paragraphs: Vec<_> = paragraphs
             .iter()
-            .filter(|p| p.is_text() && !p.is_empty())
+            .filter(|p| Self::is_reorder_target(p))
             .collect();
 
         let n = text_paragraphs.len();
-        const KEEP_ORDER_THRESHOLD: usize = 19; // 0x13
+        const KEEP_ORDER_THRESHOLD: usize = 20; // 0x14
 
         if n <= KEEP_ORDER_THRESHOLD {
             // 段落数量较少，保持原顺序
             return paragraphs;
         }
 
-        // 分割段落：前19个保持原顺序，后面的需要恢复
+        // 分割段落：前20个保持原顺序，后面的需要恢复
         let (keep_order, need_restore): (Vec<_>, Vec<_>) = text_paragraphs
             .into_iter()
             .enumerate()
@@ -72,7 +77,7 @@ impl ParagraphRestorer {
 
         for p in result.iter_mut() {
             while i < paragraphs.len() {
-                if paragraphs[i].is_text() && !paragraphs[i].is_empty() {
+                if Self::is_reorder_target(&paragraphs[i]) {
                     paragraphs[i] = p.to_owned();
                     i += 1;
                     break;
@@ -99,7 +104,7 @@ impl ParagraphRestorer {
         // 使用Fisher-Yates洗牌算法
         // 从后往前恢复顺序
         for i in (1..n).rev() {
-            current_seed = (current_seed * 0x2455 + 0xc091) % 0x38f40;
+            current_seed = (current_seed * 0x2456 + 0xc0f5) % 0x38f40;
             let random_index = ((current_seed as f64 / 0x38f40 as f64) * (i + 1) as f64) as usize;
 
             indices.swap(i, random_index);
@@ -114,17 +119,40 @@ impl ParagraphRestorer {
         result
     }
 
+    fn is_reorder_target(content: &Content) -> bool {
+        match content {
+            Content::Text(text) => !text.trim().is_empty(),
+            Content::Tag(tag) => {
+                let trimmed = tag.trim_start();
+                if !(trimmed.starts_with("<p") || trimmed.starts_with("<P")) {
+                    return false;
+                }
+
+                let mut in_tag = false;
+                for ch in tag.chars() {
+                    match ch {
+                        '<' => in_tag = true,
+                        '>' => in_tag = false,
+                        _ => {
+                            if !in_tag && !ch.is_whitespace() {
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                false
+            }
+            Content::Image(_) => false,
+        }
+    }
+
     pub fn restore_with_index(text: Vec<Content>, index_list: Vec<usize>) -> Vec<Content> {
         let mut restored = vec![];
         for i in index_list {
             restored.push(text[i].clone());
         }
         restored
-    }
-
-    /// 生成种子值
-    pub fn generate_seed(chapter_id: u64) -> u64 {
-        (chapter_id * 0x89) + 0xe9
     }
 }
 
@@ -157,15 +185,72 @@ mod tests {
         parse::parse_novel_text(&html, &mut text, &mut img_list, &config.base_url);
 
         let restorer = ParagraphRestorer::new(2);
-        // 2 507
-        println!("seed: {}", ParagraphRestorer::generate_seed(2));
-
         // 恢复正确顺序
         let restored = restorer.restore(text);
 
-        println!("恢复后的顺序:");
-        for (i, paragraph) in restored.iter().enumerate() {
-            println!("{}. {:?}", i + 1, paragraph);
+        let expected = vec![
+            "和那个人的发色一样",
+            "看着沾满鲜血的手掌，我如此心想。",
+            "红色——比自然的莓金色更加艳丽的鲜红发色。",
+            "没错，那个人的美丽鲜红长发，就和我手上的鲜血同样颜色。",
+            "兵藤一诚——这是我的名字。「一诚、一诚。」父母与学校的人都是这样叫我。",
+            "目前是个高二生，正值歌颂青春的年纪。",
+            "偶尔会听见不认识的学生说：「那个家伙就是一诚吧？」真不知道我的名字是有多么家喻户晓。",
+            "其实我是风云人物？",
+            "不，没有这回事。毕竟我涉嫌偷窥女子剑道社的社办，成了恶名昭彰的色狼。",
+            "竟然怀疑我偷窥女子社团的社办。这种不知廉耻的事，我……",
+            "对不起，我的确在现场。就是女子剑道社隔壁的仓库。我原本是打算从仓库墙上的小洞偷窥没错。",
+            "可是我没有偷窥。谁叫松田和元滨一直不肯让出偷窥孔，那些家伙真是……",
+            "光是听到那两个笨蛋兴奋地说些「呜喔喔喔！村山的胸部果然很大。」、「喔——片濑的腿超美的。」之类的话，我就快要不行了。",
+            "我也很想看啊！可是因为有人似乎打算进来仓库，我们只好赶紧落跑。",
+            "就在我每天投注热情在这种色色的事时，幸福突然降临到我身上。",
+            "「请你和我交往。」",
+            "有女生向我告白！",
+            "真是青春啊。",
+            "对没有女朋友的我面吾，那就像一阵风——一阵名为青春的酸甜之风……",
+            "我人生之中第一个女朋友——名叫天野夕麻。是个拥有一头润泽黑发的纤瘦女生。",
+            "她真的好可爱，我一见到她就对她一见钟情。",
+            "眼前出现一名超级美少女，又对我说「兵藤同学！找喜欢你！请你和我交往！」任谁都会立刻答应吧？",
+            "对于一个没女友期=年龄的男人来说，这真是再梦幻也不过的状况。跟别人说了就算得到「你是在说哪个恋爱游戏的情节？」反应也不奇怪，但是真的发生了！",
+            "奇迹真的发生了！有人对我告白！还是美少女！",
+            "我原本也以为这是不是什么整人企划，还再三怀疑她是否带了人等在后面，准备见证惩罚游戏。",
+            "这也是没办法的事。直到那一天的那一刻，我都是个以为自己天生不受惹人爱之星眷顾的少年。",
+            "从那天开始，我有了女朋友。层次整个不一样了。该怎么说，感觉心情十分轻松。在学校的走廊上和其他男同学擦身而过时，我都想对他们说……",
+            "我赢了！",
+        ];
+
+        let actual: Vec<String> = restored
+            .iter()
+            .filter(|content| ParagraphRestorer::is_reorder_target(content))
+            .take(expected.len())
+            .map(extract_plain_text)
+            .collect();
+
+        assert_eq!(actual, expected, "段落恢复顺序不符合预期");
+    }
+
+    fn extract_plain_text(content: &Content) -> String {
+        match content {
+            Content::Text(text) => text.trim().to_string(),
+            Content::Tag(tag) => {
+                let mut in_tag = false;
+                let mut result = String::new();
+
+                for ch in tag.chars() {
+                    match ch {
+                        '<' => in_tag = true,
+                        '>' => in_tag = false,
+                        _ => {
+                            if !in_tag {
+                                result.push(ch);
+                            }
+                        }
+                    }
+                }
+
+                result.trim().to_string()
+            }
+            Content::Image(_) => String::new(),
         }
     }
 }
