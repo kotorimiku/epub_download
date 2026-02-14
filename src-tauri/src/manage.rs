@@ -174,7 +174,7 @@ pub async fn get_last_update_by_with_volume(
     book_id: &str,
     volume_id: &str,
 ) -> Result<String> {
-    let html = client.get_volume(book_id, volume_id, &None).await?;
+    let html = client.get_volume(book_id, volume_id, None).await?;
     let last_update = parse_last_update(&html).ok_or(anyhow::anyhow!("last_update is required"))?;
     Ok(last_update)
 }

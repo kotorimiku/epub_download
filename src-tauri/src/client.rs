@@ -109,7 +109,7 @@ impl BiliClient {
     pub async fn get_html(
         &self,
         url: &str,
-        message: &Option<App>,
+        message: Option<&App>,
         sleep_time: u32,
     ) -> Result<String> {
         println!("  {url}");
@@ -178,7 +178,7 @@ impl BiliClient {
         }
     }
 
-    pub async fn get_novel(&self, book_id: &str, message: &Option<App>) -> Result<String> {
+    pub async fn get_novel(&self, book_id: &str, message: Option<&App>) -> Result<String> {
         let url = self.base_url.join(&format!("/novel/{}.html", book_id))?;
 
         self.get_html(url.as_str(), message, 0).await
@@ -188,7 +188,7 @@ impl BiliClient {
         &self,
         book_id: &str,
         volume_id: &str,
-        message: &Option<App>,
+        message: Option<&App>,
     ) -> Result<String> {
         let url = self
             .base_url
@@ -197,7 +197,7 @@ impl BiliClient {
         self.get_html(url.as_str(), message, 0).await
     }
 
-    pub async fn get_catalog(&self, book_id: &str, message: &Option<App>) -> Result<String> {
+    pub async fn get_catalog(&self, book_id: &str, message: Option<&App>) -> Result<String> {
         let url = self.base_url.join(&format!("/novel/{}/catalog", book_id))?;
 
         self.get_html(url.as_str(), message, 0).await

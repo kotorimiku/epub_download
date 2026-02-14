@@ -6,6 +6,10 @@ pub struct ParagraphRestorer {
 }
 
 impl ParagraphRestorer {
+    pub fn get_version() -> &'static str {
+        "chapterlog.js?v1006a8"
+    }
+
     /// 创建新的段落恢复器
     ///
     /// # 参数
@@ -16,7 +20,6 @@ impl ParagraphRestorer {
 
     /// 从字符串列表中恢复正确顺序
     ///
-    /// chapterlog.js?v1006a6
     /// 实现与JavaScript相同的逻辑：
     /// - 如果段落数量 <= 19，保持原顺序
     /// - 如果段落数量 > 19，前19个保持原顺序，后面的需要恢复

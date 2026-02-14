@@ -49,7 +49,7 @@ pub struct Downloader {
 async fn get_metadata(
     book_id: &str,
     client: &BiliClient,
-    app_handle: &Option<App>,
+    app_handle: Option<&App>,
 ) -> Result<BookInfo> {
     Ok(parse_metadata(
         &client.get_novel(book_id, app_handle).await?,
@@ -59,7 +59,7 @@ async fn get_metadata(
 async fn get_volume_list(
     book_id: &str,
     client: &BiliClient,
-    app_handle: &Option<App>,
+    app_handle: Option<&App>,
 ) -> Result<Vec<VolumeInfo>> {
     Ok(parse_volume_list(
         &client.get_catalog(book_id, app_handle).await?,
@@ -74,12 +74,12 @@ impl Downloader {
             &config.user_agent,
             &config.header_map,
         )?;
-        let book_info = get_metadata(&config.book_id, &client, &config.app_handle).await?;
+        let book_info = get_metadata(&config.book_id, &client, config.app_handle.as_ref()).await?;
         if book_info.title.is_none() {
             return Err(anyhow!("Book not found"));
         }
         let volume_infos =
-            get_volume_list(config.book_id.as_str(), &client, &config.app_handle).await?;
+            get_volume_list(config.book_id.as_str(), &client, config.app_handle.as_ref()).await?;
         Ok(Self {
             base_url: config.base_url,
             book_id: config.book_id,
@@ -127,7 +127,7 @@ impl Downloader {
         I: IntoIterator<Item = u32>,
     {
         send(
-            &self.app_handle,
+            self.app_handle.as_ref(),
             &format!(
                 "开始下载{}，{}",
                 &self.book_id,
@@ -146,12 +146,12 @@ impl Downloader {
 
     async fn download_single(&self, volume: &mut VolumeInfo, volume_no: usize) -> Result<()> {
         if volume.chapter_path_list.is_empty() {
-            send(&self.app_handle, "章节列表为空");
+            send(self.app_handle.as_ref(), "章节列表为空");
             return Ok(());
         }
 
         send(
-            &self.app_handle,
+            self.app_handle.as_ref(),
             &format!(
                 " -正在下载第{}卷，{}",
                 volume_no,
@@ -176,7 +176,7 @@ impl Downloader {
 
         for i in 0..volume.chapter_list.len() {
             send(
-                &self.app_handle,
+                self.app_handle.as_ref(),
                 &format!("  -正在下载第{}章，{}", i + 1, volume.chapter_list[i]),
             );
             let mut chapter_text = Vec::new();
@@ -213,7 +213,7 @@ impl Downloader {
                 .partition(|content| matches!(content, Content::Text(_) | Content::Tag(_)));
             // 分离封面
             if images.is_empty() {
-                send(&self.app_handle, "  插图页无插图，删除插图页");
+                send(self.app_handle.as_ref(), "  插图页无插图，删除插图页");
                 volume.chapter_list.remove(0);
                 // 添加封面
                 add_cover();
@@ -261,13 +261,16 @@ impl Downloader {
         }
 
         if image_urls.len() != image_exts.len() {
-            send(&self.app_handle, "图片数量与扩展名数量不匹配");
-            send(&self.app_handle, &format!("图片数量: {}", image_urls.len()));
+            send(self.app_handle.as_ref(), "图片数量与扩展名数量不匹配");
             send(
-                &self.app_handle,
+                self.app_handle.as_ref(),
+                &format!("图片数量: {}", image_urls.len()),
+            );
+            send(
+                self.app_handle.as_ref(),
                 &format!("扩展名数量: {}", image_exts.len()),
             );
-            send(&self.app_handle, &format!("{:?}", image_urls));
+            send(self.app_handle.as_ref(), &format!("{:?}", image_urls));
             Err(anyhow!("图片数量与扩展名数量不匹配"))?;
         }
 
@@ -311,7 +314,7 @@ impl Downloader {
                 .unwrap();
         epub_builder.save_file(path.as_path())?;
         send(
-            &self.app_handle,
+            self.app_handle.as_ref(),
             &format!("\n  下载完成，保存到: {}", &path.display()),
         );
         Ok(())
@@ -324,7 +327,10 @@ impl Downloader {
             url.to_string()
         };
 
-        let html = self.client.get_html(&url, &self.app_handle, 0).await?;
+        let html = self
+            .client
+            .get_html(&url, self.app_handle.as_ref(), 0)
+            .await?;
         let desc = parse_vol_desc(&html);
         Ok(desc)
     }
@@ -339,7 +345,7 @@ impl Downloader {
                 .get_next_chapter_url(
                     &self
                         .client
-                        .get_html(&url, &self.app_handle, self.sleep_time)
+                        .get_html(&url, self.app_handle.as_ref(), self.sleep_time)
                         .await?,
                 )
                 .await?;
@@ -354,7 +360,7 @@ impl Downloader {
             if url.contains("_") {
                 current_html = self
                     .client
-                    .get_html(&url, &self.app_handle, self.sleep_time)
+                    .get_html(&url, self.app_handle.as_ref(), self.sleep_time)
                     .await?;
             } else {
                 return Ok(url);
@@ -372,7 +378,7 @@ impl Downloader {
             }
         }
 
-        send(&self.app_handle, "寻找章节链接失败");
+        send(self.app_handle.as_ref(), "寻找章节链接失败");
         println!("{}", html);
         Err(anyhow!("寻找章节链接失败"))
     }
@@ -417,7 +423,7 @@ impl Downloader {
         img_url_list: &[String],
         img_source_list: &[String],
     ) -> Result<Vec<Vec<u8>>> {
-        send(&self.app_handle, "  正在下载插图");
+        send(self.app_handle.as_ref(), "  正在下载插图");
 
         let mut img_data_list = Vec::new();
         for i in 0..img_url_list.len() {
@@ -431,16 +437,19 @@ impl Downloader {
 
                 if self.error_img.contains(&img_url_list[i]) {
                     send(
-                        &self.app_handle,
+                        self.app_handle.as_ref(),
                         &format!("\n  错误图片，跳过: {}", img_url_list[i]),
                     );
                     error_img = true;
                     break;
                 }
 
-                send(&self.app_handle, "\n  插图下载失败，正在重试");
-                send(&self.app_handle, &format!("  {}", img_source_list[i]));
-                send(&self.app_handle, &format!("  {}", img_url_list[i]));
+                send(self.app_handle.as_ref(), "\n  插图下载失败，正在重试");
+                send(
+                    self.app_handle.as_ref(),
+                    &format!("  {}", img_source_list[i]),
+                );
+                send(self.app_handle.as_ref(), &format!("  {}", img_url_list[i]));
                 sleep(std::time::Duration::from_secs(5));
             }
 
@@ -460,7 +469,7 @@ impl Downloader {
 
             // 进度
             print(
-                &self.app_handle,
+                self.app_handle.as_ref(),
                 &format!("\r  Progress: {}/{}", i + 1, img_url_list.len()),
             ); // 使用 \r 覆盖同一行
 
@@ -528,20 +537,10 @@ impl Downloader {
     ) -> Result<String> {
         let html = self
             .client
-            .get_html(url, &self.app_handle, self.sleep_time)
+            .get_html(url, self.app_handle.as_ref(), self.sleep_time)
             .await?;
 
-        #[cfg(feature = "gui")]
-        let html = crate::event::html(self.app_handle.as_ref().unwrap(), &html)?;
-
-        let mut chapter = Vec::new();
-        parse_novel_text(&html, &mut chapter, img_list, &self.base_url);
-
-        if chapter.is_empty() {
-            send(&self.app_handle, "   章节内容为空");
-            println!("{}", html);
-            return Err(anyhow!("Chapter text is empty"));
-        }
+        let chapter = self.paragraph_restorer(&html, img_list, url)?;
 
         // let chapter_id = url.split("/").last().unwrap().split(".").next().unwrap().split("_").next().unwrap().parse::<u64>().unwrap();
 
@@ -578,26 +577,98 @@ impl Downloader {
 
         let mut current_url = self.get_next_url(&html)?;
         while current_url.contains("_") {
-            send(&self.app_handle, "   正在下载分页");
+            send(self.app_handle.as_ref(), "   正在下载分页");
             let html = self
                 .client
-                .get_html(&current_url, &self.app_handle, self.sleep_time)
+                .get_html(&current_url, self.app_handle.as_ref(), self.sleep_time)
                 .await?;
 
-            #[cfg(feature = "gui")]
-            let html = crate::event::html(self.app_handle.as_ref().unwrap(), &html)?;
-
-            let mut chapter = Vec::new();
-            parse_novel_text(&html, &mut chapter, img_list, &self.base_url);
-
-            if chapter.is_empty() {
-                return Err(anyhow!("无法获取章节内容"));
-            }
+            let chapter = self.paragraph_restorer(&html, img_list, &current_url)?;
 
             chapter_text.extend(chapter);
 
             current_url = self.get_next_url(&html)?;
         }
         Ok(current_url)
+    }
+
+    fn paragraph_restorer(
+        &self,
+        html: &str,
+        img_list: &mut Vec<String>,
+        _url: &str,
+    ) -> Result<Vec<Content>> {
+        #[cfg(feature = "gui")]
+        let html = &crate::event::html(self.app_handle.as_ref().unwrap(), html)?;
+
+        let mut chapter = Vec::new();
+        parse_novel_text(html, &mut chapter, img_list, &self.base_url);
+
+        if chapter.is_empty() {
+            send(self.app_handle.as_ref(), "   章节内容为空");
+            println!("{}", html);
+            return Err(anyhow!("Chapter text is empty"));
+        }
+
+        #[cfg(not(feature = "gui"))]
+        let chapter = {
+            use crate::paragraph_restorer::ParagraphRestorer;
+            if Self::_get_chapterlog_version(html)? != ParagraphRestorer::get_version() {
+                return Err(anyhow!("章节日志版本不匹配，无法恢复章节顺序"));
+            }
+            let chapter_id = _url
+                .split("/")
+                .last()
+                .unwrap()
+                .split(".")
+                .next()
+                .unwrap()
+                .split("_")
+                .next()
+                .unwrap()
+                .parse::<u64>()
+                .unwrap();
+
+            let restorer = ParagraphRestorer::new(chapter_id);
+            restorer.restore(chapter)
+        };
+
+        Ok(chapter)
+    }
+
+    fn _get_chapterlog_version(html: &str) -> Result<String> {
+        let re = Regex::new(r"chapterlog\.js\?v([\w.]+)").unwrap();
+        if let Some(captures) = re.captures(html) {
+            println!("chapterlog.js version: {:?}", &captures);
+            if let Some(version) = captures.get(0) {
+                return Ok(version.as_str().to_string());
+            }
+        }
+
+        Err(anyhow!("chapterlog.js version not found"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+
+    #[tokio::test]
+    async fn test_get_chapterlog_version() {
+        let config = Config::default();
+        let client = BiliClient::new(
+            config.base_url.as_str(),
+            config.cookie.as_str(),
+            config.user_agent.as_str(),
+            &config.headers,
+        )
+        .unwrap();
+        let html = client
+            .get_html("https://www.bilinovel.com/novel/1/108523.html", None, 0)
+            .await
+            .unwrap();
+        let version = Downloader::_get_chapterlog_version(&html).unwrap();
+        println!("version: {}", version);
     }
 }

@@ -1,4 +1,5 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+pub mod cli;
 pub mod client;
 pub mod config;
 pub mod downloader;
@@ -11,6 +12,8 @@ pub mod paragraph_restorer;
 pub mod parse;
 pub mod secret;
 pub mod utils;
+
+pub use cli::run_cli;
 
 #[cfg(feature = "gui")]
 pub mod command;
