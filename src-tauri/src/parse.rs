@@ -232,11 +232,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_parse_last_update() {
-        let html = client::BiliClient::new("https://www.bilinovel.com", "", "", &HashMap::new())
-            .unwrap()
-            .get_novel("1", None)
-            .await
-            .unwrap();
+        let html =
+            client::BiliClient::new("https://www.bilinovel.com", "", "", &HashMap::new(), false)
+                .unwrap()
+                .get_novel("1", None)
+                .await
+                .unwrap();
         let last_update = parse_last_update(&html);
         println!("last_update: {:?}", last_update);
     }

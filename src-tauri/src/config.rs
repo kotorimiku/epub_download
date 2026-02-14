@@ -32,6 +32,8 @@ pub struct Config {
     pub error_img: HashSet<String>,
     #[serde(default = "default_auto_check_update")]
     pub auto_check_update: bool,
+    #[serde(default = "default_convert_simple_chinese")]
+    pub convert_simple_chinese: bool,
 }
 
 impl Default for Config {
@@ -47,6 +49,7 @@ impl Default for Config {
             add_catalog: false,
             error_img: HashSet::new(),
             auto_check_update: true,
+            convert_simple_chinese: false,
         }
     }
 }
@@ -108,4 +111,8 @@ fn default_error_img() -> HashSet<String> {
 
 fn default_auto_check_update() -> bool {
     true
+}
+
+fn default_convert_simple_chinese() -> bool {
+    false
 }

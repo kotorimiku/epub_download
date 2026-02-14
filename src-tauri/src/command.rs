@@ -26,6 +26,7 @@ pub async fn get_book_info(
         output,
         template,
         sleep_time,
+        convert_simple_chinese,
         cookie,
         user_agent,
         header_map,
@@ -39,6 +40,7 @@ pub async fn get_book_info(
             config.output.clone(),
             config.template.clone(),
             config.sleep_time,
+            config.convert_simple_chinese,
             config.cookie.clone(),
             config.user_agent.clone(),
             config.headers.clone(),
@@ -53,6 +55,7 @@ pub async fn get_book_info(
         output,
         template,
         sleep_time,
+        convert_simple_chinese,
         cookie,
         user_agent,
         header_map,
@@ -84,6 +87,7 @@ pub async fn download(
         output,
         template,
         sleep_time,
+        convert_simple_chinese,
         cookie,
         user_agent,
         header_map,
@@ -96,6 +100,7 @@ pub async fn download(
             config.output.clone(),
             config.template.clone(),
             config.sleep_time,
+            config.convert_simple_chinese,
             config.cookie.clone(),
             config.user_agent.clone(),
             config.headers.clone(),
@@ -116,6 +121,7 @@ pub async fn download(
                 output,
                 template,
                 sleep_time,
+                convert_simple_chinese,
                 cookie,
                 user_agent,
                 header_map,
@@ -155,7 +161,8 @@ pub async fn browser_url(url: String, config: State<'_, RwLock<Config>>) -> Resu
             config.headers.clone(),
         )
     };
-    let client = crate::client::BiliClient::new(&base_url, &cookie, &user_agent, &header_map)?;
+    let client =
+        crate::client::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false)?;
     let result = client.get(&url).await?;
     Ok(result)
 }
@@ -178,8 +185,13 @@ pub async fn get_config_vue(config: State<'_, RwLock<Config>>) -> Result<Config>
 #[tauri::command]
 #[specta::specta]
 pub async fn check_update() -> Result<String> {
-    let client =
-        crate::client::BiliClient::new("https://www.bilinovel.com", "", "", &HashMap::new())?;
+    let client = crate::client::BiliClient::new(
+        "https://www.bilinovel.com",
+        "",
+        "",
+        &HashMap::new(),
+        false,
+    )?;
     let result = client.check_update().await?;
     Ok(result)
 }

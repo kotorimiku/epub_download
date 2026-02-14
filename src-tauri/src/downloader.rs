@@ -24,6 +24,7 @@ pub struct DownloaderConfig {
     pub output: String,
     pub template: String,
     pub sleep_time: u32,
+    pub convert_simple_chinese: bool,
     pub cookie: String,
     pub user_agent: String,
     pub header_map: HashMap<String, String>,
@@ -73,6 +74,7 @@ impl Downloader {
             &config.cookie,
             &config.user_agent,
             &config.header_map,
+            config.convert_simple_chinese,
         )?;
         let book_info = get_metadata(&config.book_id, &client, config.app_handle.as_ref()).await?;
         if book_info.title.is_none() {
@@ -105,6 +107,7 @@ impl Downloader {
             &config.cookie,
             &config.user_agent,
             &config.header_map,
+            config.convert_simple_chinese,
         )?;
         Ok(Self {
             base_url: config.base_url,
@@ -662,10 +665,11 @@ mod tests {
             config.cookie.as_str(),
             config.user_agent.as_str(),
             &config.headers,
+            config.convert_simple_chinese,
         )
         .unwrap();
         let html = client
-            .get_html("https://www.bilinovel.com/novel/1/108523.html", None, 0)
+            .get("https://www.bilinovel.com/novel/1/108523.html")
             .await
             .unwrap();
         let version = Downloader::_get_chapterlog_version(&html).unwrap();

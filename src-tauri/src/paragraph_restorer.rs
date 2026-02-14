@@ -143,6 +143,7 @@ mod tests {
             config.cookie.as_str(),
             config.user_agent.as_str(),
             &config.headers,
+            config.convert_simple_chinese,
         )
         .unwrap();
 

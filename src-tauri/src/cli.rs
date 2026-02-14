@@ -1,5 +1,6 @@
 use std::process;
 
+use anyhow::Result;
 use clap::Parser;
 
 use crate::{
@@ -13,7 +14,7 @@ struct Args {
     #[arg(short, long, help = "书籍id")]
     book_id: String,
 
-    #[arg(short, long, default_value_t = String::new(), help = "需要下载的卷数，下载多卷请使用逗号分隔或者连字符-，下载所有使用all")]
+    #[arg(short, long, default_value_t = String::new(), help = "需要下载的卷数，下载多卷请使用,分隔或者连字符-，下载所有使用all")]
     volume: String,
 
     #[arg(short, long, help = "输出目录")]
@@ -37,7 +38,7 @@ struct Args {
     template: Option<String>,
 }
 
-pub async fn run_cli() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_cli() -> Result<(), anyhow::Error> {
     let args = Args::parse();
 
     let mut config = Config::default();
@@ -57,6 +58,7 @@ pub async fn run_cli() -> Result<(), Box<dyn std::error::Error>> {
         output: config.output.clone(),
         template: config.template.clone(),
         sleep_time: config.sleep_time,
+        convert_simple_chinese: config.convert_simple_chinese,
         cookie: config.cookie.clone(),
         user_agent: config.user_agent.clone(),
         header_map: config.headers.clone(),

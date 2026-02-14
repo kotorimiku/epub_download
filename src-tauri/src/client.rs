@@ -82,6 +82,7 @@ pub fn get_headers(
 pub struct BiliClient {
     client: Client,
     base_url: Url,
+    convert_simple_chinese: bool,
 }
 
 impl BiliClient {
@@ -90,11 +91,13 @@ impl BiliClient {
         cookie: &str,
         user_agent: &str,
         header_map: &HashMap<String, String>,
+        convert_simple_chinese: bool,
     ) -> Result<Self> {
         let headers = get_headers(referer, cookie, user_agent, header_map)?;
         Ok(Self {
             client: Client::builder().default_headers(headers).build()?,
             base_url: Url::parse(referer)?,
+            convert_simple_chinese,
         })
     }
 
@@ -126,7 +129,7 @@ impl BiliClient {
                 }
                 if let Ok(t) = res.text().await {
                     let mut text = t;
-                    if url.contains("tw.linovelib.com") {
+                    if self.convert_simple_chinese {
                         text = t2s(&text);
                     }
                     if text.contains("used Cloudflare to restrict access") {
@@ -265,7 +268,7 @@ mod tests {
 
     #[tokio::test]
     async fn download_test() {
-        let client = BiliClient::new("https://www.bilinovel.com", "", "", &HashMap::new());
+        let client = BiliClient::new("https://www.bilinovel.com", "", "", &HashMap::new(), false);
         let result = client
             .unwrap()
             .get("https://www.bilinovel.com/novel/115/catalog")
