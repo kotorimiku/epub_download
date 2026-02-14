@@ -3,13 +3,13 @@
 
 #[cfg(windows)]
 fn attach_console() {
-    use winapi::um::wincon::{ATTACH_PARENT_PROCESS, AttachConsole};
+    use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
 
     unsafe {
+        // 把当前进程附加到父控制台
         let _ = AttachConsole(ATTACH_PARENT_PROCESS);
     }
 }
-
 #[tokio::main]
 async fn main() {
     #[cfg(windows)]
