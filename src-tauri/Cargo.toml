@@ -34,7 +34,7 @@ specta-typescript = { version = "0.0.9", optional = true }
 
 reqwest = {version = "0.13.2", default-features = false, features = ["gzip", "deflate", "brotli", "zstd", "json", "native-tls"] }
 scraper = "0.25.0"
-zip = "7.4.0"
+zip = "8.0.0"
 tokio = { version = "1.42.0", features = ["full"] }
 regex = "1.11.1"
 chrono = { version = "0.4.39" }
@@ -49,11 +49,14 @@ walkdir = "2.5.0"
 quick-xml = { version = "0.39.0", features = ["serialize"] }
 
 [target.'cfg(windows)'.dependencies]
-# winapi = { version = "0.3.9", features = ["consoleapi", "wincon"] }
 windows = { version = "0.62.2", features = ["Win32_System_Console"] }
 
+[profile.dev]
+incremental = true
+
 [profile.release]
-strip = true
-lto = true
 codegen-units = 1
+lto = true
+opt-level = "z"
 panic = "abort"
+strip = true
