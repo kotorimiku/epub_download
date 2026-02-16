@@ -21,48 +21,24 @@ pub async fn get_book_info(
     app: AppHandle,
     book_id: String,
 ) -> Result<(BookInfo, Vec<VolumeInfo>)> {
-    let (
-        base_url,
-        output,
-        template,
-        sleep_time,
-        convert_simple_chinese,
-        cookie,
-        user_agent,
-        header_map,
-        add_catalog,
-        error_img,
-    ) = {
+    let downloader_config = {
         let config = config.read();
 
-        (
-            config.base_url.clone(),
-            config.output.clone(),
-            config.template.clone(),
-            config.sleep_time,
-            config.convert_simple_chinese,
-            config.cookie.clone(),
-            config.user_agent.clone(),
-            config.headers.clone(),
-            config.add_catalog,
-            config.error_img.clone(),
-        )
+        DownloaderConfig {
+            base_url: config.base_url.clone(),
+            book_id,
+            output: config.output.clone(),
+            template: config.template.clone(),
+            sleep_time: config.sleep_time,
+            convert_simple_chinese: config.convert_simple_chinese,
+            cookie: config.cookie.clone(),
+            user_agent: config.user_agent.clone(),
+            header_map: config.headers.clone(),
+            add_catalog: config.add_catalog,
+            error_img: config.error_img.clone(),
+            app_handle: Some(app),
+        }
     }; // config 在这里自动 drop 释放锁
-
-    let downloader_config = DownloaderConfig {
-        base_url,
-        book_id: book_id.clone(),
-        output,
-        template,
-        sleep_time,
-        convert_simple_chinese,
-        cookie,
-        user_agent,
-        header_map,
-        add_catalog,
-        error_img,
-        app_handle: Some(app),
-    };
 
     let result = Downloader::new(downloader_config).await?;
 
@@ -82,31 +58,22 @@ pub async fn download(
     volume_list: Vec<VolumeInfo>,
     volume_no_list: Vec<u32>,
 ) -> Result<()> {
-    let (
-        base_url,
-        output,
-        template,
-        sleep_time,
-        convert_simple_chinese,
-        cookie,
-        user_agent,
-        header_map,
-        add_catalog,
-        error_img,
-    ) = {
+    let downloader_config = {
         let config = config.read();
-        (
-            config.base_url.clone(),
-            config.output.clone(),
-            config.template.clone(),
-            config.sleep_time,
-            config.convert_simple_chinese,
-            config.cookie.clone(),
-            config.user_agent.clone(),
-            config.headers.clone(),
-            config.add_catalog,
-            config.error_img.clone(),
-        )
+        DownloaderConfig {
+            base_url: config.base_url.clone(),
+            book_id,
+            output: config.output.clone(),
+            template: config.template.clone(),
+            sleep_time: config.sleep_time,
+            convert_simple_chinese: config.convert_simple_chinese,
+            cookie: config.cookie.clone(),
+            user_agent: config.user_agent.clone(),
+            header_map: config.headers.clone(),
+            add_catalog: config.add_catalog,
+            error_img: config.error_img.clone(),
+            app_handle: Some(app),
+        }
     };
 
     // 创建取消接收器
@@ -115,20 +82,6 @@ pub async fn download(
     // 使用 tokio::select! 来处理下载任务和取消信号
     tokio::select! {
         result = async {
-            let downloader_config = DownloaderConfig {
-                base_url,
-                book_id,
-                output,
-                template,
-                sleep_time,
-                convert_simple_chinese,
-                cookie,
-                user_agent,
-                header_map,
-                add_catalog,
-                error_img,
-                app_handle: Some(app),
-            };
             let downloader = Downloader::new_from(downloader_config, book_info, volume_list)?;
             downloader.download(volume_no_list.into_iter()).await
         } => {
