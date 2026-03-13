@@ -1,24 +1,5 @@
 use std::{collections::HashMap, sync::OnceLock};
 
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn it_works() {
-        println!(
-            "{}",
-            super::decode_text("朱音那双被泪水沾湿的眼眸绽放出柔和的微笑。")
-        );
-        println!(
-            "{}",
-            std::str::from_utf8(
-                "扭隅扔帐充就，真泥病低，佛格科办孤。".as_bytes()
-            )
-            .unwrap()
-        );
-    }
-}
-
 static SECRET_MAP: OnceLock<HashMap<String, String>> = OnceLock::new();
 
 pub fn get_secret_map() -> &'static HashMap<String, String> {
@@ -7043,4 +7024,23 @@ pub fn get_secret_map_() -> HashMap<String, String> {
 }
     "#;
     serde_json::from_str(json_data).unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn it_works() {
+        println!(
+            "{}",
+            super::decode_text("朱音那双被泪水沾湿的眼眸绽放出柔和的微笑。")
+        );
+        println!(
+            "{}",
+            std::str::from_utf8(
+                "扭隅扔帐充就，真泥病低，佛格科办孤。".as_bytes()
+            )
+            .unwrap()
+        );
+    }
 }
