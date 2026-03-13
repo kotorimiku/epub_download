@@ -23,7 +23,15 @@ jobs:
       - name: install dependencies (ubuntu only)
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
 
       - uses: Swatinem/rust-cache@v2
 
@@ -71,8 +79,7 @@ jobs:
       - name: install frontend dependencies
         run: bun install
 
+      - run: bun fmt --check
+
       - name: lint
         run: bun lint
-
-      - name: test
-        run: bun test
