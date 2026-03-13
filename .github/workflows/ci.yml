@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  backend_check:
+    name: CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install dependencies (ubuntu only)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Setup Rust nightly fmt
+        run: |
+          rustup toolchain install nightly
+          rustup component add --toolchain nightly rustfmt
+
+      - name: install dependencies (ubuntu only)
+        if: runner.os == 'Linux'
+        run: sudo apt install libgtk-3-dev libxdo-dev libappindicator3-dev
+
+      - name: Format
+        run: |
+          cd src-tauri
+          cargo +nightly fmt --all -- --check
+
+      - name: Check
+        run: |
+          cd src-tauri
+          cargo check --all-targets --all-features
+
+      - name: Clippy
+        run: |
+          cd src-tauri
+          cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Test
+        run: |
+          cd src-tauri
+          cargo test --all-features
+
+  frontend_check:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: install frontend dependencies
+        run: bun install
+
+      - name: lint
+        run: bun lint
+
+      - name: test
+        run: bun test

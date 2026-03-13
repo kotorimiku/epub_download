@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": true,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "endOfLine": "lf",
+  "sortPackageJson": true,
+  "sortImports": {
+    "order": "asc",
+    "internalPattern": ["~/", "@/"],
+    "groups": [
+      "builtin",
+      "external",
+      ["internal", "subpath"],
+      ["parent", "sibling", "index"],
+      "style",
+      "unknown"
+    ],
+    "customGroups": []
+  },
+  "ignorePatterns": [
+    "*.md",
+    "*.toml",
+    "src/bindings.ts",
+    "src/auto-imports.d.ts",
+    "src/components.d.ts"
+  ]
+}

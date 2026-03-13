@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
-import { commands } from "../bindings";
-import { useRunCommand } from "../composables/RunCommand";
-import { Book } from "../bindings";
+import { ref, onMounted, computed } from 'vue';
+
+import { commands } from '../bindings';
+import { Book } from '../bindings';
+import { useRunCommand } from '../composables/RunCommand';
 
 const books = ref<Book[]>([]);
 const runCommand = useRunCommand();

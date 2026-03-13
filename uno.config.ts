@@ -6,8 +6,8 @@ import {
   presetWebFonts,
   presetWind3,
   transformerDirectives,
-  transformerVariantGroup
-} from 'unocss'
+  transformerVariantGroup,
+} from 'unocss';
 
 export default defineConfig({
   shortcuts: [
@@ -16,7 +16,7 @@ export default defineConfig({
   theme: {
     colors: {
       // ...
-    }
+    },
   },
   presets: [
     presetWind3(),
@@ -29,8 +29,5 @@ export default defineConfig({
       },
     }),
   ],
-  transformers: [
-    transformerDirectives(),
-    transformerVariantGroup(),
-  ],
-})
+  transformers: [transformerDirectives(), transformerVariantGroup()],
+});

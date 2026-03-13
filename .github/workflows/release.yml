@@ -1,58 +1,58 @@
-name: "publish"
+name: 'publish'
 
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
 
 jobs:
   get-version:
     runs-on: ubuntu-latest
     outputs:
-      VERSION: ${{ steps.get_version.outputs.VERSION }}
+      version: ${{ steps.get_version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Get version number
         id: get_version
         run: |
-          VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          version=$(jq -r '.version' src-tauri/tauri.conf.json)
+          echo "version=$version" >> $GITHUB_OUTPUT
 
   get-product-name:
     runs-on: ubuntu-latest
     outputs:
-      PRODUCT_NAME: ${{ steps.get_product_name.outputs.PRODUCT_NAME }}
+      product_name: ${{ steps.get_product_name.outputs.product_name }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Get product name
         id: get_product_name
         run: |
-          PRODUCT_NAME=$(jq -r '.productName' src-tauri/tauri.conf.json)
-          echo "PRODUCT_NAME=$PRODUCT_NAME" >> $GITHUB_OUTPUT
+          product_name=$(jq -r '.productName' src-tauri/tauri.conf.json)
+          echo "product_name=$product_name" >> $GITHUB_OUTPUT
 
   publish-tauri:
     needs: [get-version, get-product-name]
     env:
-      VERSION: ${{ needs.get-version.outputs.VERSION }}
-      PRODUCT_NAME: ${{ needs.get-product-name.outputs.PRODUCT_NAME }}
+      VERSION: ${{ needs.get-version.outputs.version }}
+      PRODUCT_NAME: ${{ needs.get-product-name.outputs.product_name }}
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-latest"
-            arch: "aarch64"
-            args: "--target aarch64-apple-darwin"
-          - platform: "macos-latest"
-            arch: "x86_64"
-            args: "--target x86_64-apple-darwin"
-          - platform: "ubuntu-22.04"
-            args: ""
-          - platform: "windows-latest"
-            args: ""
+          - platform: 'macos-latest'
+            arch: 'aarch64'
+            args: '--target aarch64-apple-darwin'
+          - platform: 'macos-latest'
+            arch: 'x86_64'
+            args: '--target x86_64-apple-darwin'
+          - platform: 'ubuntu-22.04'
+            args: ''
+          - platform: 'windows-latest'
+            args: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -77,6 +77,8 @@ jobs:
       - name: install frontend dependencies
         run: bun install
 
+      - uses: Swatinem/rust-cache@v2
+
       - name: build
         uses: tauri-apps/tauri-action@v0
         with:
@@ -89,14 +91,20 @@ jobs:
         if: matrix.platform == 'windows-latest'
         run: |
           cp src-tauri/target/release/bundle/nsis/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_x64-setup.exe artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_windows_x64-setup.exe
-          cp src-tauri/target/release/${{ env.PRODUCT_NAME }}.exe artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_windows_x64-portable.exe
+          cd src-tauri/target/release
+          7z a ${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_windows_x64-portable.zip ${{ env.PRODUCT_NAME }}.exe
+          cd -
+          cp ${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_windows_x64-portable.zip artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_windows_x64-portable.zip
 
       - name: Copy linux to release assets
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           cp src-tauri/target/release/bundle/deb/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_amd64.deb artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_linux_amd64.deb
           cp src-tauri/target/release/bundle/rpm/${{ env.PRODUCT_NAME }}-${{ env.VERSION }}-1.x86_64.rpm artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_linux_amd64.rpm
-          cp src-tauri/target/release/${{ env.PRODUCT_NAME }} artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_linux_amd64
+          cd src-tauri/target/release
+          tar -czf ${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_linux_amd64.tar.gz ${{ env.PRODUCT_NAME }}
+          cd -
+          cp ${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_linux_amd64.tar.gz artifacts/${{ env.PRODUCT_NAME }}_${{ env.VERSION }}_linux_amd64.tar.gz
 
       - name: Copy macos to release assets
         if: matrix.platform == 'macos-latest'
@@ -112,14 +120,13 @@ jobs:
           path: artifacts/*
 
   create-release:
-    needs: [ publish-tauri, get-version ]
+    needs: [publish-tauri, get-version]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: release-assets-*
           path: artifacts/
           merge-multiple: true
 
@@ -129,10 +136,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: v${{ needs.get-version.outputs.VERSION }}
-          body: |
-            Take a look at the assets to download and install this app.
+          name: Release v${{ needs.get-version.outputs.version }}
           files: |
             artifacts/*
           draft: true
           prerelease: false
+          generate_release_notes: true

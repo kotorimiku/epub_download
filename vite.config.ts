@@ -1,10 +1,11 @@
-import { defineConfig } from "vite";
-import vue from "@vitejs/plugin-vue";
-import AutoImport from 'unplugin-auto-import/vite'
-import Components from 'unplugin-vue-components/vite'
-import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
-import UnoCss from 'unocss/vite'
-import path from "path";
+import path from 'path';
+
+import vue from '@vitejs/plugin-vue';
+import UnoCss from 'unocss/vite';
+import AutoImport from 'unplugin-auto-import/vite';
+import { NaiveUiResolver } from 'unplugin-vue-components/resolvers';
+import Components from 'unplugin-vue-components/vite';
+import { defineConfig } from 'vite';
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -17,26 +18,21 @@ export default defineConfig(async () => ({
       imports: [
         'vue',
         {
-          'naive-ui': [
-            'useDialog',
-            'useMessage',
-            'useNotification',
-            'useLoadingBar'
-          ]
-        }
+          'naive-ui': ['useDialog', 'useMessage', 'useNotification', 'useLoadingBar'],
+        },
       ],
       dts: 'src/auto-imports.d.ts',
     }),
     Components({
       resolvers: [NaiveUiResolver()],
       dirs: ['src/components', 'src/views'],
-      dts: 'src/components.d.ts'
+      dts: 'src/components.d.ts',
     }),
   ],
 
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "src"),
+      '@': path.resolve(__dirname, 'src'),
     },
   },
 
@@ -51,14 +47,14 @@ export default defineConfig(async () => ({
     host: host || false,
     hmr: host
       ? {
-          protocol: "ws",
+          protocol: 'ws',
           host,
           port: 1421,
         }
       : undefined,
     watch: {
       // 3. tell vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      ignored: ['**/src-tauri/**'],
     },
   },
 }));

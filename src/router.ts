@@ -1,27 +1,28 @@
-import { createRouter, createWebHashHistory } from "vue-router";
-import Search from "./views/Search.vue";
-import Config from "./views/Config.vue";
-import Manage from "./views/Manage.vue";
+import { createRouter, createWebHashHistory } from 'vue-router';
+
+import Config from './views/Config.vue';
+import Manage from './views/Manage.vue';
+import Search from './views/Search.vue';
 
 const routes = [
   {
-    path: "/",
-    redirect: "/search",
+    path: '/',
+    redirect: '/search',
   },
   {
-    path: "/search",
+    path: '/search',
     component: Search,
   },
   {
-    path: "/config",
+    path: '/config',
     component: Config,
   },
   {
-    path: "/manage",
+    path: '/manage',
     component: Manage,
   },
   {
-    path: "/web",
+    path: '/web',
     component: { template: '<div></div>' }, // 空组件，因为 Web 组件在 App.vue 中单独处理
   },
 ];

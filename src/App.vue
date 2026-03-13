@@ -3,16 +3,9 @@
     <n-notification-provider>
       <AutoCheckUpdate />
 
-      <div
-        class="flex flex-col overflow-hidden"
-        style="height: calc(100vh - 20px)"
-      >
+      <div class="flex flex-col overflow-hidden" style="height: calc(100vh - 20px)">
         <div class="flex gap-2 p-2 bg-gray-50 border-b flex-shrink-0">
-          <n-button
-            type="primary"
-            :ghost="$route.path !== '/search'"
-            @click="changePage('search')"
-          >
+          <n-button type="primary" :ghost="$route.path !== '/search'" @click="changePage('search')">
             搜索页面
           </n-button>
 
@@ -61,10 +54,10 @@
 </template>
 
 <script setup lang="ts">
-import router from "./router";
-import Web from "./views/Web.vue";
+import router from './router';
+import Web from './views/Web.vue';
 
-const changePage = (page: "search" | "config" | "web" | "manage") => {
+const changePage = (page: 'search' | 'config' | 'web' | 'manage') => {
   router.push(`/${page}`);
 };
 </script>

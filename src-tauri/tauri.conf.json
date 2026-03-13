@@ -25,16 +25,11 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": [
-      "icons/logo.png",
-      "icons/logo.ico"
-    ],
+    "icon": ["icons/logo.png", "icons/logo.ico"],
     "windows": {
       "nsis": {
         "installMode": "perMachine",
-        "languages": [
-          "SimpChinese"
-        ]
+        "languages": ["SimpChinese"]
       }
     }
   }
