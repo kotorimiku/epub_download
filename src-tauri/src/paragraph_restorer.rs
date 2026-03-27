@@ -6,6 +6,18 @@ pub struct ParagraphRestorer {
 }
 
 impl ParagraphRestorer {
+    // 算法相关常量
+    const KEEP_ORDER_THRESHOLD: usize = 20;
+    // 0x14
+
+    // 种子生成常量
+    const SEED_MULTIPLIER: u64 = 0x7e;
+    const SEED_OFFSET: u64 = 0xe8;
+    const SHUFFLE_INCREMENT: u64 = 0xc0f5;
+    const SHUFFLE_MODULUS: u64 = 0x38f40;
+    // 洗牌算法常量
+    const SHUFFLE_MULTIPLIER: u64 = 0x2456;
+
     pub fn get_version() -> &'static str {
         "chapterlog.js?v1006c1.3"
     }
@@ -20,7 +32,7 @@ impl ParagraphRestorer {
 
     /// 生成种子值
     pub fn generate_seed(chapter_id: u64) -> u64 {
-        (chapter_id * 0x7e) + 0xe8
+        (chapter_id * Self::SEED_MULTIPLIER) + Self::SEED_OFFSET
     }
 
     /// 从字符串列表中恢复正确顺序
@@ -45,9 +57,8 @@ impl ParagraphRestorer {
             .collect();
 
         let n = text_paragraphs.len();
-        const KEEP_ORDER_THRESHOLD: usize = 20; // 0x14
 
-        if n <= KEEP_ORDER_THRESHOLD {
+        if n <= Self::KEEP_ORDER_THRESHOLD {
             // 段落数量较少，保持原顺序
             return paragraphs;
         }
@@ -56,7 +67,7 @@ impl ParagraphRestorer {
         let (keep_order, need_restore): (Vec<_>, Vec<_>) = text_paragraphs
             .into_iter()
             .enumerate()
-            .partition(|(i, _)| *i < KEEP_ORDER_THRESHOLD);
+            .partition(|(i, _)| *i < Self::KEEP_ORDER_THRESHOLD);
 
         // 只对需要恢复的部分进行排序
         let restored_part = self.restore_partial(
@@ -104,8 +115,10 @@ impl ParagraphRestorer {
         // 使用Fisher-Yates洗牌算法
         // 从后往前恢复顺序
         for i in (1..n).rev() {
-            current_seed = (current_seed * 0x2456 + 0xc0f5) % 0x38f40;
-            let random_index = ((current_seed as f64 / 0x38f40 as f64) * (i + 1) as f64) as usize;
+            current_seed = (current_seed * Self::SHUFFLE_MULTIPLIER + Self::SHUFFLE_INCREMENT)
+                % Self::SHUFFLE_MODULUS;
+            let random_index =
+                ((current_seed as f64 / Self::SHUFFLE_MODULUS as f64) * (i + 1) as f64) as usize;
 
             indices.swap(i, random_index);
         }
