@@ -85,6 +85,10 @@
         </n-input>
       </n-form-item>
 
+      <n-form-item label="debug模式">
+        <n-switch v-model:value="debug" />
+      </n-form-item>
+
       <!-- 是否添加目录页 -->
       <n-form-item label="添加目录页">
         <n-switch v-model:value="addCatalog" />
@@ -153,7 +157,7 @@
 </template>
 
 <script setup lang="ts">
-import QuestionCircle24Regular from '@vicons/fluent/QuestionCircle24Regular';
+import { QuestionCircle24Regular } from '@vicons/fluent';
 import {
   NForm,
   NFormItem,
@@ -168,8 +172,8 @@ import {
 import { ref, onMounted, h } from 'vue';
 
 import { commands } from '../bindings';
-import { useRunCommand } from '../composables/RunCommand';
 import { useNotify } from '../composables/useNotification';
+import { useRunCommand } from '../composables/useRunCommand';
 
 const runCommand = useRunCommand();
 const notify = useNotify();
@@ -180,6 +184,7 @@ const sleepTime = ref<number>(8);
 const cookie = ref<string>('');
 const userAgent = ref<string>('');
 const output = ref<string>('');
+const debug = ref(false);
 const addCatalog = ref(false);
 const autoCheckUpdate = ref(true);
 const version = ref<string>('');
@@ -209,6 +214,7 @@ const saveConfig = () => {
         baseUrl: baseUrl.value,
         addCatalog: addCatalog.value,
         autoCheckUpdate: autoCheckUpdate.value,
+        debug: debug.value,
       }),
     onSuccess: () => {
       notify.success({ content: '保存成功' });
@@ -283,6 +289,7 @@ onMounted(() => {
         userAgent.value = res.userAgent;
         output.value = res.output;
         addCatalog.value = res.addCatalog;
+        debug.value = res.debug;
         if (typeof res.autoCheckUpdate === 'boolean') {
           autoCheckUpdate.value = res.autoCheckUpdate;
         } else {

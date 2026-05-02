@@ -1,9 +1,10 @@
 use std::io::Cursor;
 
-use anyhow::Result;
 use fast2s::convert;
 use image::{ImageFormat, ImageReader, codecs::jpeg::JpegEncoder};
 use semver::Version;
+
+use crate::error::Result;
 
 pub fn t2s(str: &str) -> String {
     // traditional_to_simplified(str).to_string()

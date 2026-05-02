@@ -4,10 +4,10 @@ import { NInput, NButton } from 'naive-ui';
 import { ref, onMounted } from 'vue';
 
 import { commands } from '@/bindings';
-import { useRunCommand } from '@/composables/RunCommand';
+import { useRunCommand } from '@/composables/useRunCommand';
 import { globalStore } from '@/store/global';
 
-import { restoreHtml } from '../composables/event';
+import { restoreHtml } from '../utils/event';
 
 const iframe = ref<HTMLIFrameElement | null>(null);
 const url = ref<string>('');
@@ -109,28 +109,35 @@ onMounted(async () => {
 
   Object.defineProperty(iframe.value!, 'srcdoc', {
     set: function (html: string) {
-      // 在HTML头部注入脚本，在其他脚本执行前修改navigator.platform
-      const scriptTag = String.raw`<script>
-            Object.defineProperty(navigator, "platform", {
-              get: function () {
-                return "android";
-              },
-              configurable: true,
-            });
-          <\/script>`;
-
-      // 在head标签后插入脚本，如果没有head标签则在html标签后插入
+      // 调整 HTML 确保有 <head>
       let modifiedHtml = html;
-      if (html.includes('<head>')) {
-        modifiedHtml = html.replace('<head>', `<head>${scriptTag}`);
-      } else if (html.includes('<html>')) {
-        modifiedHtml = html.replace('<html>', `<html><head>${scriptTag}</head>`);
-      } else {
-        modifiedHtml = `<html><head>${scriptTag}</head><body>${html}</body></html>`;
+      if (!html.includes('<head>')) {
+        if (html.includes('<html>')) {
+          modifiedHtml = html.replace('<html>', '<html><head></head>');
+        } else {
+          modifiedHtml = `<html><head></head><body>${html}</body></html>`;
+        }
       }
 
-      // 调用原始的srcdoc setter
-      originalSrcdocDescriptor?.set?.call(this, modifiedHtml);
+      // 创建一个临时 DOM 解析器
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(modifiedHtml, 'text/html');
+
+      // 创建脚本节点，修改 navigator.platform
+      const script = doc.createElement('script');
+      script.textContent = `
+      Object.defineProperty(navigator, "platform", {
+        get: function() { return "android"; },
+        configurable: true
+      });
+    `;
+
+      // 插入到 <head> 最前面
+      doc.head.prepend(script);
+
+      // 调用原始 srcdoc setter
+      const finalHtml = doc.documentElement.outerHTML;
+      originalSrcdocDescriptor?.set?.call(this, finalHtml);
     },
     get: function () {
       return originalSrcdocDescriptor?.get?.call(this);
@@ -149,6 +156,8 @@ onMounted(async () => {
     doc.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown' }));
 
     await waitForAcontentRestored(doc);
+
+    console.log('aContent should be fully restored now, cleaning up...');
 
     doc
       .getElementById('acontent')

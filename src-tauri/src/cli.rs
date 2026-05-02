@@ -1,11 +1,11 @@
 use std::process;
 
-use anyhow::Result;
 use clap::Parser;
 
 use crate::{
     config::Config,
     downloader::{Downloader, DownloaderConfig},
+    error::Result,
 };
 
 #[derive(Parser, Debug)]
@@ -41,7 +41,7 @@ struct Args {
     debug: Option<bool>,
 }
 
-pub async fn run_cli() -> Result<(), anyhow::Error> {
+pub async fn run_cli() -> Result<()> {
     let args = Args::parse();
 
     let mut config = Config::default();

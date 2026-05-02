@@ -6,12 +6,13 @@ use std::{
     thread::sleep,
 };
 
-use anyhow::{Result, anyhow};
 use regex::Regex;
 
 use crate::{
+    bail,
     client::*,
     epub_builder::{Body, ContentBlock, EpubBuilder, Metadata, MetadataConfig},
+    error::Result,
     message::{self, print, send},
     model::{App, BookInfo, Content, VolumeInfo},
     parse::{parse_metadata, parse_novel_text, parse_vol_desc, parse_volume_list},
@@ -82,7 +83,7 @@ impl Downloader {
         )?;
         let book_info = get_metadata(&config.book_id, &client, config.app_handle.as_ref()).await?;
         if book_info.title.is_none() {
-            return Err(anyhow!("Book not found"));
+            bail!("Book not found");
         }
         let volume_infos =
             get_volume_list(config.book_id.as_str(), &client, config.app_handle.as_ref()).await?;
@@ -145,8 +146,13 @@ impl Downloader {
         io::stdout().flush().unwrap();
         for no in volume_no {
             if let Some(volume) = self.volume_infos.get(no as usize - 1) {
-                self.download_single(&mut volume.clone(), no as usize)
-                    .await?;
+                match self.download_single(&mut volume.clone(), no as usize).await {
+                    Ok(()) => (),
+                    Err(err) => message::send(
+                        self.app_handle.as_ref(),
+                        &format!("下载第{}卷失败: {:?}", no, err),
+                    ),
+                }
             }
         }
         Ok(())
@@ -279,7 +285,7 @@ impl Downloader {
                 &format!("扩展名数量: {}", image_exts.len()),
             );
             send(self.app_handle.as_ref(), &format!("{:?}", image_urls));
-            Err(anyhow!("图片数量与扩展名数量不匹配"))?;
+            bail!("图片数量与扩展名数量不匹配");
         }
 
         //下载插图
@@ -388,7 +394,7 @@ impl Downloader {
 
         send(self.app_handle.as_ref(), "寻找章节链接失败");
         println!("{}", html);
-        Err(anyhow!("寻找章节链接失败"))
+        bail!("寻找章节链接失败")
     }
 
     fn get_save_path(&self, volume_no: &str, title: &str) -> Result<PathBuf> {
@@ -450,7 +456,7 @@ impl Downloader {
                     Err(err) => {
                         message::send(
                             self.app_handle.as_ref(),
-                            &format!("  插图下载失败: {}", err),
+                            &format!("  插图下载失败: {:?}", err),
                         );
                     }
                 };
@@ -488,10 +494,7 @@ impl Downloader {
             }
 
             if img_data.is_empty() {
-                return Err(anyhow!(format!(
-                    "插图下载失败,{},{}",
-                    img_url_list[i], img_source_list[i]
-                )));
+                bail!("插图下载失败,{},{}", img_url_list[i], img_source_list[i]);
             }
 
             img_data_list.push(img_data);
@@ -633,7 +636,7 @@ impl Downloader {
                 }
 
                 #[cfg(not(feature = "gui"))]
-                return Err(anyhow!("当前构建未启用 gui feature"));
+                bail!("当前构建未启用 gui feature");
             }
             RunMode::Cli => Cow::Borrowed(html),
         };
@@ -644,7 +647,7 @@ impl Downloader {
         if chapter.is_empty() {
             send(self.app_handle.as_ref(), "   章节内容为空");
             println!("{}", html);
-            return Err(anyhow!("Chapter text is empty"));
+            bail!("章节内容为空");
         }
 
         let chapter = match *RUN_MODE.lock() {
@@ -653,7 +656,7 @@ impl Downloader {
                 use crate::paragraph_restorer::ParagraphRestorer;
                 if Self::get_chapterlog_version(html.as_ref())? != ParagraphRestorer::get_version()
                 {
-                    return Err(anyhow!("章节日志版本不匹配，无法恢复章节顺序"));
+                    bail!("章节日志版本不匹配，无法恢复章节顺序");
                 }
                 let chapter_id = _url
                     .split("/")
@@ -684,7 +687,7 @@ impl Downloader {
             }
         }
 
-        Err(anyhow!("chapterlog.js version not found"))
+        bail!("chapterlog.js version not found")
     }
 }
 

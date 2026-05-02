@@ -1,13 +1,18 @@
 use std::collections::HashMap;
 
-use anyhow::{Result, anyhow};
 use reqwest::{
     Client,
     header::{ACCEPT, ACCEPT_LANGUAGE, COOKIE, HeaderMap, HeaderName, HeaderValue, USER_AGENT},
 };
 use url::Url;
 
-use crate::{message::send, model::App, utils, utils::t2s};
+use crate::{
+    bail, err,
+    error::Result,
+    message::send,
+    model::App,
+    utils::{self, t2s},
+};
 
 pub fn get_headers(
     referer: &str,
@@ -106,9 +111,9 @@ impl BiliClient {
 
     pub async fn get(&self, url: &str) -> Result<String> {
         if let Ok(res) = self.client.get(url).send().await {
-            res.text().await.map_err(|e| anyhow!(e))
+            Ok(res.text().await?)
         } else {
-            Err(anyhow!("请求失败"))
+            bail!("请求失败")
         }
     }
 
@@ -128,7 +133,7 @@ impl BiliClient {
                     send(message, "url重定向");
                     send(message, &format!("原始url: {}", url));
                     send(message, &format!("重定向到: {}", res.url()));
-                    return Err(anyhow!("url重定向"));
+                    bail!("url重定向");
                 }
                 if let Ok(t) = res.text().await {
                     let mut text = t;
@@ -142,29 +147,29 @@ impl BiliClient {
                     }
                     if text.contains("Just a moment...") || text.contains("403 Forbidden") {
                         send(message, "下载失败，请稍后再试");
-                        return Err(anyhow!("下载失败，请稍后再试"));
+                        bail!("下载失败，请稍后再试");
                     }
                     if text.contains("對不起，該書內容已刪除")
                         || text.contains("对不起，该书内容已删除")
                     {
                         send(message, "该书内容已删除");
-                        return Err(anyhow!("该书内容已删除"));
+                        bail!("该书内容已删除");
                     }
                     if text.contains("章節內容審核未通過") || text.contains("章节内容审核未通过")
                     {
                         send(message, "该书内容审核未通过");
-                        return Err(anyhow!("该书内容审核未通过"));
+                        bail!("该书内容审核未通过");
                     }
                     if text.contains("抱歉，该小说未经审核")
                         || text.contains("抱歉，該小說未經審核")
                     {
                         send(message, "该小说未经审核");
-                        return Err(anyhow!("该小说未经审核"));
+                        bail!("该小说未经审核");
                     }
                     if text.contains("抱歉，該小說不存在") || text.contains("抱歉，该小说不存在")
                     {
                         send(message, "该小说不存在");
-                        return Err(anyhow!("该小说不存在"));
+                        bail!("该小说不存在");
                     }
                     if text.contains("通告～客戶端停用中")
                         || text.contains("通告～客户端停用中")
@@ -233,7 +238,7 @@ impl BiliClient {
                 }
             };
         }
-        Err(anyhow!("插图下载失败"))
+        bail!("插图下载失败")
     }
 
     pub async fn check_update(&self) -> Result<String> {
@@ -242,12 +247,12 @@ impl BiliClient {
         let json = res.json::<serde_json::Value>().await?;
         let version = json["tag_name"]
             .as_str()
-            .ok_or_else(|| anyhow!("未获取到最新版本号"))?;
+            .ok_or_else(|| err!("未获取到最新版本号"))?;
         let local_version = env!("CARGO_PKG_VERSION");
         let is_newer = utils::is_newer_version(local_version, version);
         let download_url = json["html_url"]
             .as_str()
-            .ok_or_else(|| anyhow!("未获取到下载地址"))?;
+            .ok_or_else(|| err!("未获取到下载地址"))?;
         if is_newer {
             Ok(format!("最新版本: {}\n下载地址: {}", version, download_url))
         } else {

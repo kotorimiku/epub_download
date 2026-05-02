@@ -3,9 +3,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Listener};
+
+use crate::error::Result;
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]

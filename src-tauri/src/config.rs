@@ -3,7 +3,7 @@ use std::{
     fs::{read_to_string, write},
 };
 
-use anyhow::Result;
+use crate::error::Result;
 
 const CONFIG_FILE: &str = "./config.json";
 pub const INDEX_FILE: &str = "./index.json";

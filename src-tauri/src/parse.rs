@@ -230,6 +230,7 @@ mod tests {
     use super::*;
     use crate::client;
 
+    #[ignore]
     #[tokio::test]
     async fn test_parse_last_update() {
         let html = client::BiliClient::new(

@@ -1,13 +1,15 @@
 use std::{collections::HashMap, fs::File, io::Read};
 
-use anyhow::Result;
 use quick_xml::de::from_str;
 use serde::Deserialize;
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
 use crate::{
+    bail,
     client::BiliClient,
+    err,
+    error::Result,
     model::{Book, Volume},
     parse::parse_last_update,
 };
@@ -70,10 +72,10 @@ pub fn build_index(path: &str) -> Result<Vec<Book>> {
                         .trim_start_matches("/")
                         .split("/")
                         .next()
-                        .ok_or(anyhow::anyhow!("identifier is required"))?
+                        .ok_or(err!("identifier is required"))?
                         .to_string()
                 } else {
-                    return Err(anyhow::anyhow!("identifier is required"));
+                    bail!("identifier is required");
                 };
 
                 let volume_id = if let Some(identifier) = &package.metadata.identifier {
@@ -81,10 +83,10 @@ pub fn build_index(path: &str) -> Result<Vec<Book>> {
                         .split("/")
                         .last()
                         .map(|s| s.trim_start_matches("vol_").trim_end_matches(".html"))
-                        .ok_or(anyhow::anyhow!("identifier is required"))?
+                        .ok_or(err!("identifier is required"))?
                         .to_string()
                 } else {
-                    return Err(anyhow::anyhow!("identifier is required"));
+                    bail!("identifier is required");
                 };
 
                 let mut updated_at = None;
@@ -112,16 +114,16 @@ pub fn build_index(path: &str) -> Result<Vec<Book>> {
                         .metadata
                         .identifier
                         .clone()
-                        .ok_or(anyhow::anyhow!("identifier is required"))?,
-                    volume_no: index.ok_or(anyhow::anyhow!("index is required"))?,
-                    updated_at: updated_at.ok_or(anyhow::anyhow!("updated_at is required"))?,
+                        .ok_or(err!("identifier is required"))?,
+                    volume_no: index.ok_or(err!("index is required"))?,
+                    updated_at: updated_at.ok_or(err!("updated_at is required"))?,
                     path: entry.path().to_string_lossy().to_string(),
                 };
 
                 if books.contains_key(&id) {
                     books
                         .get_mut(&id)
-                        .ok_or(anyhow::anyhow!("book is required"))?
+                        .ok_or(err!("book is required"))?
                         .volume_list
                         .push(volume);
                 } else {
@@ -175,6 +177,6 @@ pub async fn get_last_update_by_with_volume(
     volume_id: &str,
 ) -> Result<String> {
     let html = client.get_volume(book_id, volume_id, None).await?;
-    let last_update = parse_last_update(&html).ok_or(anyhow::anyhow!("last_update is required"))?;
+    let last_update = parse_last_update(&html).ok_or(err!("last_update is required"))?;
     Ok(last_update)
 }

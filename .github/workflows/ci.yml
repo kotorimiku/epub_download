@@ -75,3 +75,6 @@ jobs:
 
       - name: lint
         run: bun lint
+
+      - name: Type Check
+        run: bun vue-tsc --noEmit

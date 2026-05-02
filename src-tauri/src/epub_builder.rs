@@ -5,9 +5,10 @@ use std::{
     path::Path,
 };
 
-use anyhow::{Result, anyhow};
 use chrono::Utc;
 use zip::{CompressionMethod, write::SimpleFileOptions};
+
+use crate::{bail, error::Result};
 
 #[derive(Default, Debug)]
 pub struct Metadata {
@@ -244,7 +245,7 @@ impl EpubBuilder {
     fn create_dir(&self, dir: Option<&Path>) -> Result<()> {
         if let Some(dir) = dir {
             if create_dir_all(dir).is_err() {
-                return Err(anyhow!("创建目录失败"));
+                bail!("创建目录失败");
             }
         }
         Ok(())

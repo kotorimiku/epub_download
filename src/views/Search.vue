@@ -76,7 +76,7 @@ import { ref, onMounted, nextTick } from 'vue';
 import { globalStore } from '@/store/global';
 
 import { commands } from '../bindings';
-import { useRunCommand } from '../composables/RunCommand';
+import { useRunCommand } from '../composables/useRunCommand';
 
 const extractIds = (els: Element[]): number[] => {
   return els

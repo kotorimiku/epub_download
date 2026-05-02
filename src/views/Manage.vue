@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 
 import { commands } from '../bindings';
 import { Book } from '../bindings';
-import { useRunCommand } from '../composables/RunCommand';
+import { useRunCommand } from '../composables/useRunCommand';
 
 const books = ref<Book[]>([]);
 const runCommand = useRunCommand();

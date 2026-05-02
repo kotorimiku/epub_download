@@ -7,9 +7,11 @@ use tokio::sync::broadcast;
 use crate::{
     config::Config,
     downloader::{Downloader, DownloaderConfig},
-    error::Result,
+    error::CommandError,
     model::{Book, BookInfo, VolumeInfo},
 };
+
+type Result<T> = std::result::Result<T, CommandError>;
 
 // 全局取消通道类型
 pub type CancelSender = Arc<broadcast::Sender<()>>;

@@ -36,18 +36,20 @@ pub fn run() {
     let (cancel_sender, _) = broadcast::channel::<()>(1);
     let cancel_sender = Arc::new(cancel_sender);
 
-    let builder = Builder::<tauri::Wry>::new().commands(collect_commands![
-        get_book_info,
-        download,
-        cancel_download,
-        browser_url,
-        save_config,
-        get_config_vue,
-        check_update,
-        get_version,
-        get_books,
-        create_index,
-    ]);
+    let builder = Builder::<tauri::Wry>::new()
+        .commands(collect_commands![
+            get_book_info,
+            download,
+            cancel_download,
+            browser_url,
+            save_config,
+            get_config_vue,
+            check_update,
+            get_version,
+            get_books,
+            create_index,
+        ])
+        .error_handling(tauri_specta::ErrorHandlingMode::Throw);
 
     #[cfg(debug_assertions)] // <- Only export on non-release builds
     builder
