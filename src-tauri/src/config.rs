@@ -34,6 +34,8 @@ pub struct Config {
     pub auto_check_update: bool,
     #[serde(default = "default_convert_simple_chinese")]
     pub convert_simple_chinese: bool,
+    #[serde(default)]
+    pub debug: bool,
 }
 
 impl Default for Config {
@@ -50,6 +52,7 @@ impl Default for Config {
             error_img: HashSet::new(),
             auto_check_update: true,
             convert_simple_chinese: false,
+            debug: false,
         }
     }
 }

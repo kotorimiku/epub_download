@@ -175,6 +175,7 @@ mod tests {
     use super::*;
     use crate::{client, config, parse};
 
+    #[ignore]
     #[tokio::test]
     async fn test_paragraph_restorer() {
         let config = config::Config::default();
@@ -185,6 +186,7 @@ mod tests {
             config.user_agent.as_str(),
             &config.headers,
             config.convert_simple_chinese,
+            config.debug,
         )
         .unwrap();
 

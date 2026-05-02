@@ -12,7 +12,7 @@ use regex::Regex;
 use crate::{
     client::*,
     epub_builder::{Body, ContentBlock, EpubBuilder, Metadata, MetadataConfig},
-    message::{print, send},
+    message::{self, print, send},
     model::{App, BookInfo, Content, VolumeInfo},
     parse::{parse_metadata, parse_novel_text, parse_vol_desc, parse_volume_list},
     runtime::{RUN_MODE, RunMode},
@@ -33,6 +33,7 @@ pub struct DownloaderConfig {
     pub add_catalog: bool,
     pub error_img: HashSet<String>,
     pub app_handle: Option<App>,
+    pub debug: bool,
 }
 
 pub struct Downloader {
@@ -77,6 +78,7 @@ impl Downloader {
             &config.user_agent,
             &config.header_map,
             config.convert_simple_chinese,
+            config.debug,
         )?;
         let book_info = get_metadata(&config.book_id, &client, config.app_handle.as_ref()).await?;
         if book_info.title.is_none() {
@@ -110,6 +112,7 @@ impl Downloader {
             &config.user_agent,
             &config.header_map,
             config.convert_simple_chinese,
+            config.debug,
         )?;
         Ok(Self {
             base_url: config.base_url,
@@ -435,7 +438,27 @@ impl Downloader {
             let mut img_data = Vec::new();
             let mut error_img = false;
             for _ in 0..50 {
-                if let Ok(data) = self.client.get_img_bytes(&img_url_list[i]).await {
+                match self
+                    .client
+                    .get_img_bytes(&img_url_list[i], self.app_handle.as_ref())
+                    .await
+                {
+                    Ok(data) => {
+                        img_data = data;
+                        break;
+                    }
+                    Err(err) => {
+                        message::send(
+                            self.app_handle.as_ref(),
+                            &format!("  插图下载失败: {}", err),
+                        );
+                    }
+                };
+                if let Ok(data) = self
+                    .client
+                    .get_img_bytes(&img_url_list[i], self.app_handle.as_ref())
+                    .await
+                {
                     img_data = data;
                     break;
                 }
@@ -459,6 +482,7 @@ impl Downloader {
             }
 
             if error_img {
+                // 使用一张空白图片占位，避免epub制作失败
                 img_data_list.push(img_data);
                 continue;
             }
@@ -678,6 +702,7 @@ mod tests {
             config.user_agent.as_str(),
             &config.headers,
             config.convert_simple_chinese,
+            config.debug,
         )
         .unwrap();
         let html = client

@@ -36,6 +36,9 @@ struct Args {
 "
     )]
     template: Option<String>,
+
+    #[arg(long, help = "开启调试模式，输出更多日志")]
+    debug: Option<bool>,
 }
 
 pub async fn run_cli() -> Result<(), anyhow::Error> {
@@ -51,6 +54,9 @@ pub async fn run_cli() -> Result<(), anyhow::Error> {
     if let Some(template) = args.template {
         config.template = template;
     }
+    if let Some(debug) = args.debug {
+        config.debug = debug;
+    }
 
     let book = Downloader::new(DownloaderConfig {
         base_url: config.base_url.clone(),
@@ -65,6 +71,7 @@ pub async fn run_cli() -> Result<(), anyhow::Error> {
         add_catalog: config.add_catalog,
         error_img: config.error_img.clone(),
         app_handle: None,
+        debug: config.debug,
     })
     .await?;
 

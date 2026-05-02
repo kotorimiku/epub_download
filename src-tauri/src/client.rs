@@ -83,6 +83,7 @@ pub struct BiliClient {
     client: Client,
     base_url: Url,
     convert_simple_chinese: bool,
+    debug: bool,
 }
 
 impl BiliClient {
@@ -92,12 +93,14 @@ impl BiliClient {
         user_agent: &str,
         header_map: &HashMap<String, String>,
         convert_simple_chinese: bool,
+        debug: bool,
     ) -> Result<Self> {
         let headers = get_headers(referer, cookie, user_agent, header_map)?;
         Ok(Self {
             client: Client::builder().default_headers(headers).build()?,
             base_url: Url::parse(referer)?,
             convert_simple_chinese,
+            debug,
         })
     }
 
@@ -206,7 +209,7 @@ impl BiliClient {
         self.get_html(url.as_str(), message, 0).await
     }
 
-    pub async fn get_img_bytes(&self, url: &str) -> Result<Vec<u8>> {
+    pub async fn get_img_bytes(&self, url: &str, message: Option<&App>) -> Result<Vec<u8>> {
         let mut client = self.client.get(url).header(
             ACCEPT,
             "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
@@ -218,24 +221,15 @@ impl BiliClient {
             );
         }
         if let Ok(response) = client.send().await {
-            // let length = response.content_length().unwrap_or(0);
-            // let code = response.status().as_u16();
             let data = response.bytes().await?;
-
-            // if code == 404 {
-            //     self.message
-            //         .send(&format!("\n  插图下载失败，404 Not Found {}", img_url));
-            //     return Vec::new();
-            // }
-
-            // if length != data.len() as u64 {
-            //     return Err("插图下载失败".to_string());
-            // }
 
             return match utils::img_to_jpg(data.to_vec()) {
                 Ok(data) => Ok(data),
-                Err(_) => {
-                    return Err(anyhow!("插图下载失败"));
+                Err(err) => {
+                    if self.debug {
+                        send(message, String::from_utf8(data.to_vec())?.as_str());
+                    }
+                    Err(err)
                 }
             };
         }
@@ -268,7 +262,14 @@ mod tests {
 
     #[tokio::test]
     async fn download_test() {
-        let client = BiliClient::new("https://www.bilinovel.com", "", "", &HashMap::new(), false);
+        let client = BiliClient::new(
+            "https://www.bilinovel.com",
+            "",
+            "",
+            &HashMap::new(),
+            false,
+            false,
+        );
         let result = client
             .unwrap()
             .get("https://www.bilinovel.com/novel/115/catalog")

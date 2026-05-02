@@ -37,6 +37,7 @@ pub async fn get_book_info(
             add_catalog: config.add_catalog,
             error_img: config.error_img.clone(),
             app_handle: Some(app),
+            debug: config.debug,
         }
     }; // config 在这里自动 drop 释放锁
 
@@ -73,6 +74,7 @@ pub async fn download(
             add_catalog: config.add_catalog,
             error_img: config.error_img.clone(),
             app_handle: Some(app),
+            debug: config.debug,
         }
     };
 
@@ -115,7 +117,7 @@ pub async fn browser_url(url: String, config: State<'_, RwLock<Config>>) -> Resu
         )
     };
     let client =
-        crate::client::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false)?;
+        crate::client::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false, false)?;
     let result = client.get(&url).await?;
     Ok(result)
 }
@@ -143,6 +145,7 @@ pub async fn check_update() -> Result<String> {
         "",
         "",
         &HashMap::new(),
+        false,
         false,
     )?;
     let result = client.check_update().await?;

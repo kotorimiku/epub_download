@@ -1,5 +1,6 @@
 use std::io::Cursor;
 
+use anyhow::Result;
 use fast2s::convert;
 use image::{ImageFormat, ImageReader, codecs::jpeg::JpegEncoder};
 use semver::Version;
@@ -26,7 +27,7 @@ pub fn escape_epub_text(input: &str) -> String {
 }
 
 /// 将非png和jpg的图片转为jpg
-pub fn img_to_jpg(data: Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub fn img_to_jpg(data: Vec<u8>) -> Result<Vec<u8>> {
     let format = image::guess_format(&data)?;
     let img = match format {
         ImageFormat::Png => data,

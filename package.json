@@ -10,6 +10,7 @@
     "tauri": "tauri",
     "fmt": "oxfmt",
     "lint": "oxlint",
+    "cargo": "cd src-tauri && cargo",
     "check": "cd src-tauri && cargo check",
     "clippy": "cd src-tauri && cargo clippy"
   },
