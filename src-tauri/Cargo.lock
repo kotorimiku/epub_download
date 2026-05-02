@@ -1357,7 +1357,7 @@ dependencies = [
 
 [[package]]
 name = "epub_download"
-version = "1.4.8"
+version = "1.4.9"
 dependencies = [
  "chrono",
  "clap",
