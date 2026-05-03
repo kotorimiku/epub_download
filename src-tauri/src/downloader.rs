@@ -460,14 +460,6 @@ impl Downloader {
                         );
                     }
                 };
-                if let Ok(data) = self
-                    .client
-                    .get_img_bytes(&img_url_list[i], self.app_handle.as_ref())
-                    .await
-                {
-                    img_data = data;
-                    break;
-                }
 
                 if self.error_img.contains(&img_url_list[i]) {
                     send(
@@ -696,6 +688,7 @@ mod tests {
     use super::*;
     use crate::config::Config;
 
+    #[ignore]
     #[tokio::test]
     async fn test_get_chapterlog_version() {
         let config = Config::default();

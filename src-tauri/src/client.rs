@@ -225,20 +225,18 @@ impl BiliClient {
                 HeaderValue::from_static("https://www.masiro.me/"),
             );
         }
-        if let Ok(response) = client.send().await {
-            let data = response.bytes().await?;
+        let response = client.send().await?;
+        let data = response.bytes().await?;
 
-            return match utils::img_to_jpg(data.to_vec()) {
-                Ok(data) => Ok(data),
-                Err(err) => {
-                    if self.debug {
-                        send(message, String::from_utf8(data.to_vec())?.as_str());
-                    }
-                    Err(err)
+        match utils::img_to_jpg(data.to_vec()) {
+            Ok(data) => Ok(data),
+            Err(err) => {
+                if self.debug {
+                    send(message, String::from_utf8(data.to_vec())?.as_str());
                 }
-            };
+                Err(err)
+            }
         }
-        bail!("插图下载失败")
     }
 
     pub async fn check_update(&self) -> Result<String> {

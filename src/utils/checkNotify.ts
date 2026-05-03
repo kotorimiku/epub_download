@@ -16,7 +16,10 @@ export async function autoCheckUpdateNotify() {
   }
 }
 
-export function checkUpdateNotify(notify: ReturnType<typeof useNotify> = useNotify(), runCommand: ReturnType<typeof useRunCommand> = useRunCommand()) {
+export function checkUpdateNotify(
+  notify: ReturnType<typeof useNotify> = useNotify(),
+  runCommand: ReturnType<typeof useRunCommand> = useRunCommand(),
+) {
   runCommand({
     command: commands.checkUpdate,
     onSuccess: async (msg) => {
