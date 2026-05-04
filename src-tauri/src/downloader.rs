@@ -239,8 +239,8 @@ impl Downloader {
             // 添加信息页
             let filter = info
                 .iter()
-                .filter(|content| !matches!(content, Content::Text(ref s) if s.is_empty()))
-                .filter(|content| !matches!(content, Content::Tag(ref s) if s.is_empty() || s.contains("<br")))
+                .filter(|content| !matches!(content, Content::Text(s) if s.is_empty()))
+                .filter(|content| !matches!(content, Content::Tag(s) if s.is_empty() || s.contains("<br")))
                 .collect::<Vec<_>>();
             if !filter.is_empty() {
                 chapters_raw.insert(0, info);
@@ -673,10 +673,10 @@ impl Downloader {
 
     fn get_chapterlog_version(html: &str) -> Result<String> {
         let re = Regex::new(r"chapterlog\.js\?v([\w.]+)").unwrap();
-        if let Some(captures) = re.captures(html) {
-            if let Some(version) = captures.get(0) {
-                return Ok(version.as_str().to_string());
-            }
+        if let Some(captures) = re.captures(html)
+            && let Some(version) = captures.get(0)
+        {
+            return Ok(version.as_str().to_string());
         }
 
         bail!("chapterlog.js version not found")

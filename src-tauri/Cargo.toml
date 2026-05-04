@@ -3,7 +3,7 @@ name = "epub_download"
 version = "1.4.10"
 description = "bilinovel downloader"
 authors = ["kotorimiku"]
-edition = "2021"
+edition = "2024"
 default-run = "epub_download"
 
 [features]
@@ -48,7 +48,7 @@ reqwest = { version = "0.13.2", default-features = false, features = [
   "brotli",
   "zstd",
   "json",
-  "native-tls",
+  "rustls"
 ] }
 scraper = "0.26.0"
 zip = "8.0.0"

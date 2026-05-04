@@ -243,10 +243,10 @@ impl EpubBuilder {
     }
 
     fn create_dir(&self, dir: Option<&Path>) -> Result<()> {
-        if let Some(dir) = dir {
-            if create_dir_all(dir).is_err() {
-                bail!("创建目录失败");
-            }
+        if let Some(dir) = dir
+            && create_dir_all(dir).is_err()
+        {
+            bail!("创建目录失败");
         }
         Ok(())
     }
@@ -589,9 +589,8 @@ fn get_time() -> String {
     let now = Utc::now();
 
     // 格式化为 ISO 8601 格式 (YYYY-MM-DDThh:mm:ssZ)
-    let iso8601_time = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
 
-    iso8601_time
+    now.format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
 pub fn escape_epub_text(input: &str) -> String {

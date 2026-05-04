@@ -23,29 +23,28 @@ pub fn parse_metadata(html: &str) -> BookInfo {
     let mut cover: Option<String> = None;
 
     for element in document.select(&h1_selector) {
-        if let Some(property) = element.value().attr("class") {
-            if property == "book-title" {
-                title = Some(element.text().collect::<String>());
-                break;
-            }
+        if let Some(property) = element.value().attr("class")
+            && property == "book-title"
+        {
+            title = Some(element.text().collect::<String>());
+            break;
         }
     }
     for element in document.select(&span_selector) {
-        if let Some(property) = element.value().attr("class") {
-            if property == "authorname" {
-                author = Some(element.text().collect::<String>());
-                break;
-            }
+        if let Some(property) = element.value().attr("class")
+            && property == "authorname"
+        {
+            author = Some(element.text().collect::<String>());
+            break;
         }
     }
     for element in document.select(&img_selector) {
-        if let Some(property) = element.value().attr("class") {
-            if property == "book-cover" {
-                if let Some(property) = element.value().attr("src") {
-                    cover = Some(property.to_string());
-                    break;
-                }
-            }
+        if let Some(property) = element.value().attr("class")
+            && property == "book-cover"
+            && let Some(property) = element.value().attr("src")
+        {
+            cover = Some(property.to_string());
+            break;
         }
     }
     for element in document.select(&em_selector) {
@@ -80,48 +79,48 @@ pub fn parse_volume_list(html: &str) -> Vec<VolumeInfo> {
     let mut volume_list: Vec<VolumeInfo> = Vec::new();
 
     for element in document.select(&ul_selector) {
-        if let Some(property) = element.value().attr("class") {
-            if property == "volume-chapters" {
-                let mut title = None;
-                let mut url_vol = None;
-                let mut chapter_list: Vec<String> = Vec::new();
-                let mut chapter_path_list = Vec::new();
-                let mut cover = None;
-                for element in element.select(&li_selector) {
-                    if let Some(property) = element.value().attr("class") {
-                        if property == "chapter-bar chapter-li" {
-                            title = Some(element.text().collect::<String>());
+        if let Some(property) = element.value().attr("class")
+            && property == "volume-chapters"
+        {
+            let mut title = None;
+            let mut url_vol = None;
+            let mut chapter_list: Vec<String> = Vec::new();
+            let mut chapter_path_list = Vec::new();
+            let mut cover = None;
+            for element in element.select(&li_selector) {
+                if let Some(property) = element.value().attr("class") {
+                    if property == "chapter-bar chapter-li" {
+                        title = Some(element.text().collect::<String>());
+                    }
+                    if property == "volume-cover chapter-li" {
+                        if let Some(element) = element.select(&a_selector).next() {
+                            url_vol = Some(element.value().attr("href").unwrap().to_string());
                         }
-                        if property == "volume-cover chapter-li" {
-                            if let Some(element) = element.select(&a_selector).next() {
-                                url_vol = Some(element.value().attr("href").unwrap().to_string());
-                            }
-                            for element in element.select(&img_selector) {
-                                if let Some(src) = element.value().attr("data-src") {
-                                    cover = Some(src.to_string());
-                                } else if let Some(src) = element.value().attr("src") {
-                                    cover = Some(src.to_string());
-                                }
-                            }
-                        }
-                        if property == "chapter-li jsChapter" {
-                            chapter_list.push(element.text().collect::<String>());
-                            if let Some(element) = element.select(&a_selector).next() {
-                                chapter_path_list
-                                    .push(element.value().attr("href").unwrap().to_string());
+                        for element in element.select(&img_selector) {
+                            if let Some(src) = element.value().attr("data-src") {
+                                cover = Some(src.to_string());
+                            } else if let Some(src) = element.value().attr("src") {
+                                cover = Some(src.to_string());
                             }
                         }
                     }
+                    if property == "chapter-li jsChapter" {
+                        chapter_list.push(element.text().collect::<String>());
+                        if let Some(element) = element.select(&a_selector).next() {
+                            chapter_path_list
+                                .push(element.value().attr("href").unwrap().to_string());
+                        }
+                    }
                 }
-                volume_list.push(VolumeInfo {
-                    title,
-                    chapter_list,
-                    chapter_path_list,
-                    url_vol,
-                    volume_no: (volume_list.len() + 1).try_into().unwrap(),
-                    cover,
-                });
             }
+            volume_list.push(VolumeInfo {
+                title,
+                chapter_list,
+                chapter_path_list,
+                url_vol,
+                volume_no: (volume_list.len() + 1).try_into().unwrap(),
+                cover,
+            });
         }
     }
     volume_list
@@ -137,56 +136,56 @@ pub fn parse_novel_text(
     let div_selector = Selector::parse("div").unwrap();
 
     for element in document.select(&div_selector) {
-        if let Some(property) = element.value().attr("id") {
-            if property == "acontent" {
-                for child in element.child_elements() {
-                    if child.value().name() == "img" {
-                        let mut img = None;
-                        if let Some(data_src) = child.value().attr("data-src") {
-                            img = Some(data_src.to_string());
-                        } else if let Some(src) = child.value().attr("src") {
-                            img = Some(src.to_string());
-                        }
-                        if let Some(img) = img {
-                            // if error_img.contains(&img) {
-                            //     continue;
-                            // }
-                            text.push(Content::Image(img.clone()));
-                            img_list.push(img);
-                        }
-                    } else if (child.value().name().len() > 1 && child.value().name().contains("p"))
-                        || (child.value().name() == "div" && child.value().attr("class").is_some())
+        if let Some(property) = element.value().attr("id")
+            && property == "acontent"
+        {
+            for child in element.child_elements() {
+                if child.value().name() == "img" {
+                    let mut img = None;
+                    if let Some(data_src) = child.value().attr("data-src") {
+                        img = Some(data_src.to_string());
+                    } else if let Some(src) = child.value().attr("src") {
+                        img = Some(src.to_string());
+                    }
+                    if let Some(img) = img {
+                        // if error_img.contains(&img) {
+                        //     continue;
+                        // }
+                        text.push(Content::Image(img.clone()));
+                        img_list.push(img);
+                    }
+                } else if (child.value().name().len() > 1 && child.value().name().contains("p"))
+                    || (child.value().name() == "div" && child.value().attr("class").is_some())
+                {
+                    continue;
+                } else {
+                    let t = child.text().collect::<String>();
+                    if t.contains("function")
+                        || t.contains("Note: 请不要")
+                        || t.contains("= window.")
                     {
                         continue;
-                    } else {
-                        let t = child.text().collect::<String>();
-                        if t.contains("function")
-                            || t.contains("Note: 请不要")
-                            || t.contains("= window.")
-                        {
-                            continue;
-                        }
-                        let raw_text = child.text();
-                        let mut texts = HashMap::new();
-                        for text in raw_text {
-                            texts.insert(text, utils::escape_epub_text(text.trim()));
-                        }
-
-                        let mut html = child.html();
-                        if let Some(class) = child.value().attr("class") {
-                            html = html.replace(format!(" class=\"{}\"", class).as_str(), "");
-                        }
-
-                        for (raw_t, t) in texts {
-                            html = html.replace(raw_t, &t);
-                        }
-
-                        if t.is_empty() {
-                            html = String::from("<br/>");
-                        }
-
-                        text.push(Content::Tag(html));
                     }
+                    let raw_text = child.text();
+                    let mut texts = HashMap::new();
+                    for text in raw_text {
+                        texts.insert(text, utils::escape_epub_text(text.trim()));
+                    }
+
+                    let mut html = child.html();
+                    if let Some(class) = child.value().attr("class") {
+                        html = html.replace(format!(" class=\"{}\"", class).as_str(), "");
+                    }
+
+                    for (raw_t, t) in texts {
+                        html = html.replace(raw_t, &t);
+                    }
+
+                    if t.is_empty() {
+                        html = String::from("<br/>");
+                    }
+
+                    text.push(Content::Tag(html));
                 }
             }
         }
