@@ -147,6 +147,7 @@ onMounted(async () => {
   });
 
   iframe.value!.onload = async () => {
+    console.log('iframe loaded, dispatching events to trigger content restoration...');
     const doc = iframe.value?.contentDocument;
     if (!doc) return;
 
@@ -174,7 +175,11 @@ onMounted(async () => {
         return;
       });
 
+    console.log('restoration complete, sending HTML back to main process...');
+
     if (!pendingRequestId.value) return;
+
+    console.log('sending restored HTML for requestId:', pendingRequestId.value);
 
     await emit('restoreHtml', {
       requestId: pendingRequestId.value,

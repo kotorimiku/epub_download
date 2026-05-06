@@ -49,6 +49,7 @@ pub struct Downloader {
     pub add_catalog: bool,
     pub error_img: HashSet<String>,
     pub app_handle: Option<App>,
+    pub debug: bool,
 }
 
 async fn get_metadata(
@@ -99,6 +100,7 @@ impl Downloader {
             add_catalog: config.add_catalog,
             error_img: config.error_img,
             app_handle: config.app_handle,
+            debug: config.debug,
         })
     }
 
@@ -127,6 +129,7 @@ impl Downloader {
             add_catalog: config.add_catalog,
             error_img: config.error_img,
             app_handle: config.app_handle,
+            debug: config.debug,
         })
     }
 
@@ -624,7 +627,15 @@ impl Downloader {
             RunMode::Gui => {
                 #[cfg(feature = "gui")]
                 {
-                    Cow::Owned(crate::event::html(self.app_handle.as_ref().unwrap(), html)?)
+                    match crate::event::html(self.app_handle.as_ref().unwrap(), html) {
+                        Ok(html) => Cow::Owned(html),
+                        Err(err) => {
+                            if self.debug {
+                                send(self.app_handle.as_ref(), html);
+                            }
+                            bail!("章节内容解析失败: {:?}", err);
+                        }
+                    }
                 }
 
                 #[cfg(not(feature = "gui"))]

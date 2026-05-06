@@ -6,7 +6,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Listener};
 
-use crate::error::Result;
+use crate::{bail, error::Result};
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -71,12 +71,15 @@ pub fn html(app_handle: &AppHandle, html: &str) -> Result<String> {
     )?;
 
     // 等待结果
-    let wait_result = receiver.recv_timeout(Duration::from_secs(10));
+    let wait_result = receiver.recv_timeout(Duration::from_secs(100));
 
     // 移除监听器
     app_handle.unlisten(listener_id);
 
-    wait_result?;
+    if let Err(err) = wait_result {
+        message(app_handle, html);
+        bail!("Failed to receive HTML result: {}", err);
+    }
 
     let result = html_result.lock().unwrap().clone();
     Ok(result)
