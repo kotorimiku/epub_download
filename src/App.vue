@@ -18,6 +18,15 @@
             网页页面
           </n-button>
 
+          <n-button
+            type="primary"
+            :ghost="$route.path !== '/request'"
+            @click="changePage('request')"
+            class="h-full"
+          >
+            请求图片
+          </n-button>
+
           <!-- <n-button
             type="primary"
             :ghost="$route.path !== '/manage'"
@@ -57,7 +66,7 @@
 import router from './router';
 import Web from './views/Web.vue';
 
-const changePage = (page: 'search' | 'config' | 'web' | 'manage') => {
+const changePage = (page: 'search' | 'config' | 'web' | 'manage' | 'request') => {
   router.push(`/${page}`);
 };
 </script>

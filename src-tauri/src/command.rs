@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use parking_lot::RwLock;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, State, ipc::Channel};
 use tokio::sync::broadcast;
 
 use crate::{
@@ -122,6 +122,29 @@ pub async fn browser_url(url: String, config: State<'_, RwLock<Config>>) -> Resu
         crate::client::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false, false)?;
     let result = client.get(&url).await?;
     Ok(result)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn request_img(
+    url: String,
+    config: State<'_, RwLock<Config>>,
+    channel: Channel<Vec<u8>>,
+) -> Result<()> {
+    let (base_url, cookie, user_agent, header_map) = {
+        let config = config.read();
+        (
+            config.base_url.clone(),
+            config.cookie.clone(),
+            config.user_agent.clone(),
+            config.headers.clone(),
+        )
+    };
+    let client =
+        crate::client::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false, false)?;
+    let result = client.get_img_bytes(&url, None).await?;
+    channel.send(result)?;
+    Ok(())
 }
 
 #[tauri::command]

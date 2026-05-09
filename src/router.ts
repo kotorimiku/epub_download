@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
 
+import BrowserImage from './views/BrowserImage.vue';
 import Config from './views/Config.vue';
 import Manage from './views/Manage.vue';
 import Search from './views/Search.vue';
@@ -20,6 +21,10 @@ const routes = [
   {
     path: '/manage',
     component: Manage,
+  },
+  {
+    path: '/request',
+    component: BrowserImage,
   },
   {
     path: '/web',

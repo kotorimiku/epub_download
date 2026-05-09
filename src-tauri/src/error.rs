@@ -4,10 +4,10 @@ pub struct CommandError(pub String);
 
 impl<E> From<E> for CommandError
 where
-    E: Into<color_eyre::eyre::Error>,
+    E: Into<color_eyre::eyre::Report> + std::fmt::Debug,
 {
     fn from(err: E) -> Self {
-        Self(format!("{:#}", err.into()))
+        Self(format!("{:?}", err))
     }
 }
 

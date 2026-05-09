@@ -48,6 +48,7 @@ pub fn run() {
             get_version,
             get_books,
             create_index,
+            request_img,
         ])
         .error_handling(tauri_specta::ErrorHandlingMode::Throw);
 

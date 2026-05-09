@@ -12,6 +12,8 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AutoCheckUpdate: typeof import('./components/AutoCheckUpdate.vue')['default']
+    BrowserImage: typeof import('./views/BrowserImage.vue')['default']
+    BrowserTest: typeof import('./views/BrowserTest.vue')['default']
     Config: typeof import('./views/Config.vue')['default']
     Manage: typeof import('./views/Manage.vue')['default']
     NButton: typeof import('naive-ui')['NButton']
