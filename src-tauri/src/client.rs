@@ -102,7 +102,10 @@ impl BiliClient {
     ) -> Result<Self> {
         let headers = get_headers(referer, cookie, user_agent, header_map)?;
         Ok(Self {
-            client: Client::builder().default_headers(headers).build()?,
+            client: Client::builder()
+                .http1_only()
+                .default_headers(headers)
+                .build()?,
             base_url: Url::parse(referer)?,
             convert_simple_chinese,
             debug,
