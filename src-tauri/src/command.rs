@@ -124,12 +124,19 @@ pub async fn browser_url(url: String, config: State<'_, RwLock<Config>>) -> Resu
     Ok(result)
 }
 
+#[derive(Debug, Clone, specta::Type, serde::Serialize, serde::Deserialize)]
+pub enum Tls {
+    NativeTls,
+    Rustls,
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn request_img(
     url: String,
-    config: State<'_, RwLock<Config>>,
+    tls: Tls,
     channel: Channel<Vec<u8>>,
+    config: State<'_, RwLock<Config>>,
 ) -> Result<()> {
     let (base_url, cookie, user_agent, header_map) = {
         let config = config.read();
@@ -140,8 +147,25 @@ pub async fn request_img(
             config.headers.clone(),
         )
     };
-    let client =
-        crate::client::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false, false)?;
+
+    let client = match tls {
+        Tls::NativeTls => crate::client::BiliClient::new_native(
+            &base_url,
+            &cookie,
+            &user_agent,
+            &header_map,
+            false,
+            false,
+        )?,
+        Tls::Rustls => crate::client::BiliClient::new_rustls(
+            &base_url,
+            &cookie,
+            &user_agent,
+            &header_map,
+            false,
+            false,
+        )?,
+    };
     let result = client.get_img_bytes(&url, None).await?;
     channel.send(result)?;
     Ok(())
