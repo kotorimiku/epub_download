@@ -14,7 +14,7 @@ export const commands = {
 	getVersion: () => __TAURI_INVOKE<string>("get_version"),
 	getBooks: () => __TAURI_INVOKE<Book[]>("get_books"),
 	createIndex: () => __TAURI_INVOKE<null>("create_index"),
-	requestImg: (url: string, tls: Tls, channel: Channel<number[]>) => __TAURI_INVOKE<null>("request_img", { url, tls, channel }),
+	requestImg: (url: string, channel: Channel<number[]>) => __TAURI_INVOKE<null>("request_img", { url, channel }),
 };
 
 /* Types */
@@ -53,8 +53,6 @@ export type Config = {
 	convertSimpleChinese?: boolean,
 	debug?: boolean,
 };
-
-export type Tls = "NativeTls" | "Rustls";
 
 export type Volume = {
 	id: string,

@@ -1,16 +1,8 @@
 <template>
   <div class="p-x-2 space-y-4 h-full flex flex-col">
     <div class="flex items-center gap-2 h-10">
-      <n-input
-        v-model:value="url"
-        placeholder="输入图片 URL"
-        class="w-96"
-        @keyup.enter="send('Rustls')"
-      />
-      <n-button type="primary" @click="send('Rustls')" :loading="loading">请求 rustls</n-button>
-      <n-button type="primary" @click="send('NativeTls')" :loading="loading"
-        >请求 native-tls</n-button
-      >
+      <n-input v-model:value="url" placeholder="输入图片 URL" class="w-96" @keyup.enter="send()" />
+      <n-button type="primary" @click="send()" :loading="loading">请求</n-button>
       <n-button @click="clear">清空</n-button>
     </div>
 
@@ -33,7 +25,6 @@ import { Channel } from '@tauri-apps/api/core';
 import { computed, onBeforeUnmount, ref } from 'vue';
 
 import { commands } from '../bindings';
-import type { Tls } from '../bindings';
 import { useRunCommand } from '../composables/useRunCommand';
 
 const url = ref<string>('');
@@ -48,7 +39,7 @@ const cardContentStyle = computed(() => ({
 
 const runCommand = useRunCommand();
 
-const send = async (tls: Tls) => {
+const send = async () => {
   if (!url.value.trim()) return;
   loading.value = true;
   if (imageSrc.value) {
@@ -69,7 +60,7 @@ const send = async (tls: Tls) => {
   };
 
   await runCommand({
-    command: () => commands.requestImg(url.value.trim(), tls, channel),
+    command: () => commands.requestImg(url.value.trim(), channel),
     onError: (err) => {
       imageSrc.value = '';
       error.value = `请求图片失败: ${err}`;

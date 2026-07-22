@@ -110,46 +110,6 @@ impl BiliClient {
         })
     }
 
-    pub fn new_rustls(
-        referer: &str,
-        cookie: &str,
-        user_agent: &str,
-        header_map: &HashMap<String, String>,
-        convert_simple_chinese: bool,
-        debug: bool,
-    ) -> Result<Self> {
-        let headers = get_headers(referer, cookie, user_agent, header_map)?;
-        Ok(Self {
-            client: Client::builder()
-                .tls_backend_rustls()
-                .default_headers(headers)
-                .build()?,
-            base_url: Url::parse(referer)?,
-            convert_simple_chinese,
-            debug,
-        })
-    }
-
-    pub fn new_native(
-        referer: &str,
-        cookie: &str,
-        user_agent: &str,
-        header_map: &HashMap<String, String>,
-        convert_simple_chinese: bool,
-        debug: bool,
-    ) -> Result<Self> {
-        let headers = get_headers(referer, cookie, user_agent, header_map)?;
-        Ok(Self {
-            client: Client::builder()
-                .tls_backend_native()
-                .default_headers(headers)
-                .build()?,
-            base_url: Url::parse(referer)?,
-            convert_simple_chinese,
-            debug,
-        })
-    }
-
     pub async fn get(&self, url: &str) -> Result<String> {
         if let Ok(res) = self.client.get(url).send().await {
             Ok(res.text().await?)
