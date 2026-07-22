@@ -126,12 +126,7 @@ pub fn parse_volume_list(html: &str) -> Vec<VolumeInfo> {
     volume_list
 }
 
-pub fn parse_novel_text(
-    html: &str,
-    text: &mut Vec<Content>,
-    img_list: &mut Vec<String>,
-    _url_base: &str,
-) {
+pub fn parse_novel_text(html: &str, text: &mut Vec<Content>, img_list: &mut Vec<String>) {
     let document = Html::parse_document(html);
     let div_selector = Selector::parse("div").unwrap();
 

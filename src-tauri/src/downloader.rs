@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     collections::{HashMap, HashSet},
     io::{self, Write},
     path::{self, PathBuf, absolute},
@@ -10,13 +9,12 @@ use regex::Regex;
 
 use crate::{
     bail,
+    bilinovel::BiliNovel,
     client::*,
     epub_builder::{Body, ContentBlock, EpubBuilder, Metadata, MetadataConfig},
     error::Result,
     message::{self, print, send},
     model::{App, BookInfo, Content, VolumeInfo},
-    parse::{parse_metadata, parse_novel_text, parse_vol_desc, parse_volume_list},
-    runtime::{RUN_MODE, RunMode},
     secret::decode_text,
     utils::remove_invalid_chars,
 };
@@ -50,26 +48,7 @@ pub struct Downloader {
     pub error_img: HashSet<String>,
     pub app_handle: Option<App>,
     pub debug: bool,
-}
-
-async fn get_metadata(
-    book_id: &str,
-    client: &BiliClient,
-    app_handle: Option<&App>,
-) -> Result<BookInfo> {
-    Ok(parse_metadata(
-        &client.get_novel(book_id, app_handle).await?,
-    ))
-}
-
-async fn get_volume_list(
-    book_id: &str,
-    client: &BiliClient,
-    app_handle: Option<&App>,
-) -> Result<Vec<VolumeInfo>> {
-    Ok(parse_volume_list(
-        &client.get_catalog(book_id, app_handle).await?,
-    ))
+    pub bilinovel: BiliNovel,
 }
 
 impl Downloader {
@@ -82,12 +61,12 @@ impl Downloader {
             config.convert_simple_chinese,
             config.debug,
         )?;
-        let book_info = get_metadata(&config.book_id, &client, config.app_handle.as_ref()).await?;
+        let bilinovel = BiliNovel::new(client.clone(), config.app_handle.clone(), config.debug);
+        let book_info = bilinovel.get_book_info(&config.book_id).await?;
         if book_info.title.is_none() {
             bail!("Book not found");
         }
-        let volume_infos =
-            get_volume_list(config.book_id.as_str(), &client, config.app_handle.as_ref()).await?;
+        let volume_infos = bilinovel.get_volume_list(&config.book_id).await?;
         Ok(Self {
             base_url: config.base_url,
             book_id: config.book_id,
@@ -101,6 +80,7 @@ impl Downloader {
             error_img: config.error_img,
             app_handle: config.app_handle,
             debug: config.debug,
+            bilinovel,
         })
     }
 
@@ -117,6 +97,7 @@ impl Downloader {
             config.convert_simple_chinese,
             config.debug,
         )?;
+        let bilinovel = BiliNovel::new(client.clone(), config.app_handle.clone(), config.debug);
         Ok(Self {
             base_url: config.base_url,
             book_id: config.book_id,
@@ -130,6 +111,7 @@ impl Downloader {
             error_img: config.error_img,
             app_handle: config.app_handle,
             debug: config.debug,
+            bilinovel,
         })
     }
 
@@ -186,9 +168,20 @@ impl Downloader {
         // 图片来源列表
         let mut img_source_list = Vec::new();
 
-        let vol_desc = self.get_vol_desc(volume.url_vol.as_ref().unwrap()).await?;
+        let vol_desc = self
+            .bilinovel
+            .get_vol_desc(volume.url_vol.as_ref().unwrap())
+            .await?;
 
-        let mut url = self.get_start_next_url(volume, volume_no).await?;
+        let mut url = self
+            .bilinovel
+            .get_start_next_url(
+                volume,
+                volume_no,
+                || &self.volume_infos[volume_no - 2],
+                self.sleep_time,
+            )
+            .await?;
         // let first_url = url.clone();
 
         for i in 0..volume.chapter_list.len() {
@@ -335,69 +328,6 @@ impl Downloader {
             &format!("\n  下载完成，保存到: {}", &path.display()),
         );
         Ok(())
-    }
-
-    async fn get_vol_desc(&self, url: &str) -> Result<Option<String>> {
-        let url = if !url.starts_with("http") {
-            format!("{}{}", self.base_url, url).as_str().to_string()
-        } else {
-            url.to_string()
-        };
-
-        let html = self
-            .client
-            .get_html(&url, self.app_handle.as_ref(), 0)
-            .await?;
-        let desc = parse_vol_desc(&html);
-        Ok(desc)
-    }
-
-    async fn get_start_next_url(&self, volume: &VolumeInfo, volume_no: usize) -> Result<String> {
-        let mut next_url = self.base_url.clone() + &volume.chapter_path_list[0].clone();
-        if next_url.contains("javascript") {
-            let pre_volume = &self.volume_infos[volume_no - 2];
-            let pre_url_path = pre_volume.chapter_path_list.last().unwrap();
-            let url = self.base_url.clone() + pre_url_path;
-            next_url = self
-                .get_next_chapter_url(
-                    &self
-                        .client
-                        .get_html(&url, self.app_handle.as_ref(), self.sleep_time)
-                        .await?,
-                )
-                .await?;
-        }
-        Ok(next_url)
-    }
-
-    async fn get_next_chapter_url(&self, html: &str) -> Result<String> {
-        let mut current_html = html.to_string();
-        loop {
-            let url = self.get_next_url(&current_html)?;
-            if url.contains("_") {
-                current_html = self
-                    .client
-                    .get_html(&url, self.app_handle.as_ref(), self.sleep_time)
-                    .await?;
-            } else {
-                return Ok(url);
-            }
-        }
-    }
-
-    fn get_next_url(&self, html: &str) -> Result<String> {
-        let re = Regex::new(r"url_next:'(.+?)'").unwrap();
-        // 使用正则表达式进行匹配
-        if let Some(captures) = re.captures(html) {
-            // 提取匹配到的第一个分组（即 URL）
-            if let Some(url) = captures.get(1) {
-                return Ok(self.base_url.clone() + url.as_str());
-            }
-        }
-
-        send(self.app_handle.as_ref(), "寻找章节链接失败");
-        println!("{}", html);
-        bail!("寻找章节链接失败")
     }
 
     fn get_save_path(&self, volume_no: &str, title: &str) -> Result<PathBuf> {
@@ -567,7 +497,7 @@ impl Downloader {
             .get_html(url, self.app_handle.as_ref(), self.sleep_time)
             .await?;
 
-        let chapter = self.paragraph_restorer(&html, img_list, url)?;
+        let chapter = self.bilinovel.paragraph_restorer(&html, img_list, url)?;
 
         chapter_text.extend(chapter);
 
@@ -597,7 +527,7 @@ impl Downloader {
             }
         }
 
-        let mut current_url = self.get_next_url(&html)?;
+        let mut current_url = self.bilinovel.get_next_url(&html)?;
         while current_url.contains("_") {
             send(self.app_handle.as_ref(), "   正在下载分页");
             let html = self
@@ -605,118 +535,14 @@ impl Downloader {
                 .get_html(&current_url, self.app_handle.as_ref(), self.sleep_time)
                 .await?;
 
-            let chapter = self.paragraph_restorer(&html, img_list, &current_url)?;
+            let chapter = self
+                .bilinovel
+                .paragraph_restorer(&html, img_list, &current_url)?;
 
             chapter_text.extend(chapter);
 
-            current_url = self.get_next_url(&html)?;
+            current_url = self.bilinovel.get_next_url(&html)?;
         }
         Ok(current_url)
-    }
-
-    fn paragraph_restorer(
-        &self,
-        html: &str,
-        img_list: &mut Vec<String>,
-        _url: &str,
-    ) -> Result<Vec<Content>> {
-        // #[cfg(feature = "gui")]
-        // let html = &crate::event::html(self.app_handle.as_ref().unwrap(), html)?;
-
-        let html = match *RUN_MODE.lock() {
-            RunMode::Gui => {
-                #[cfg(feature = "gui")]
-                {
-                    match crate::event::html(self.app_handle.as_ref().unwrap(), html) {
-                        Ok(html) => Cow::Owned(html),
-                        Err(err) => {
-                            if self.debug {
-                                send(self.app_handle.as_ref(), html);
-                            }
-                            bail!("章节内容解析失败: {:?}", err);
-                        }
-                    }
-                }
-
-                #[cfg(not(feature = "gui"))]
-                bail!("当前构建未启用 gui feature");
-            }
-            RunMode::Cli => Cow::Borrowed(html),
-        };
-
-        let mut chapter = Vec::new();
-        parse_novel_text(html.as_ref(), &mut chapter, img_list, &self.base_url);
-
-        if chapter.is_empty() {
-            send(self.app_handle.as_ref(), "   章节内容为空");
-            println!("{}", html);
-            bail!("章节内容为空");
-        }
-
-        let chapter = match *RUN_MODE.lock() {
-            RunMode::Gui => chapter,
-            RunMode::Cli => {
-                use crate::paragraph_restorer::ParagraphRestorer;
-                if Self::get_chapterlog_version(html.as_ref())? != ParagraphRestorer::get_version()
-                {
-                    bail!("章节日志版本不匹配，无法恢复章节顺序");
-                }
-                let chapter_id = _url
-                    .split("/")
-                    .last()
-                    .unwrap()
-                    .split(".")
-                    .next()
-                    .unwrap()
-                    .split("_")
-                    .next()
-                    .unwrap()
-                    .parse::<u64>()
-                    .unwrap();
-
-                let restorer = ParagraphRestorer::new(chapter_id);
-                restorer.restore(chapter)
-            }
-        };
-
-        Ok(chapter)
-    }
-
-    fn get_chapterlog_version(html: &str) -> Result<String> {
-        let re = Regex::new(r"chapterlog\.js\?v([\w.]+)").unwrap();
-        if let Some(captures) = re.captures(html)
-            && let Some(version) = captures.get(0)
-        {
-            return Ok(version.as_str().to_string());
-        }
-
-        bail!("chapterlog.js version not found")
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::config::Config;
-
-    #[ignore]
-    #[tokio::test]
-    async fn test_get_chapterlog_version() {
-        let config = Config::default();
-        let client = BiliClient::new(
-            config.base_url.as_str(),
-            config.cookie.as_str(),
-            config.user_agent.as_str(),
-            &config.headers,
-            config.convert_simple_chinese,
-            config.debug,
-        )
-        .unwrap();
-        let html = client
-            .get("https://www.bilinovel.com/novel/1/108523.html")
-            .await
-            .unwrap();
-        let version = Downloader::get_chapterlog_version(&html).unwrap();
-        println!("version: {}", version);
     }
 }

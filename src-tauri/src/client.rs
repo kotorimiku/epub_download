@@ -84,6 +84,7 @@ pub fn get_headers(
     Ok(headers)
 }
 
+#[derive(Clone)]
 pub struct BiliClient {
     client: Client,
     base_url: Url,
@@ -163,6 +164,12 @@ impl BiliClient {
         message: Option<&App>,
         sleep_time: u32,
     ) -> Result<String> {
+        let url = if !url.starts_with("http") {
+            &format!("{}{}", self.base_url, url).as_str().to_string()
+        } else {
+            url
+        };
+
         println!("  {url}");
 
         tokio::time::sleep(std::time::Duration::from_secs(sleep_time.into())).await;

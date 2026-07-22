@@ -1,4 +1,5 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+pub mod bilinovel;
 pub mod cli;
 pub mod client;
 pub mod config;
@@ -14,7 +15,10 @@ pub mod runtime;
 pub mod secret;
 pub mod utils;
 
+pub use bilinovel::BiliNovel;
 pub use cli::run_cli;
+pub use client::BiliClient;
+pub use config::Config;
 
 #[cfg(feature = "gui")]
 pub mod command;

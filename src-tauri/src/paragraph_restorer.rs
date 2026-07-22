@@ -197,7 +197,7 @@ mod tests {
 
         let mut text = vec![];
         let mut img_list = vec![];
-        parse::parse_novel_text(&html, &mut text, &mut img_list, &config.base_url);
+        parse::parse_novel_text(&html, &mut text, &mut img_list);
 
         let restorer = ParagraphRestorer::new(2);
         // 恢复正确顺序
