@@ -1,9 +1,16 @@
 <template>
   <div class="p-x-2 space-y-4 h-full flex flex-col">
     <div class="flex items-center gap-2 h-10">
-      <n-input v-model:value="url" placeholder="输入图片 URL" class="w-96" @keyup.enter="send('Rustls')" />
+      <n-input
+        v-model:value="url"
+        placeholder="输入图片 URL"
+        class="w-96"
+        @keyup.enter="send('Rustls')"
+      />
       <n-button type="primary" @click="send('Rustls')" :loading="loading">请求 rustls</n-button>
-      <n-button type="primary" @click="send('NativeTls')" :loading="loading">请求 native-tls</n-button>
+      <n-button type="primary" @click="send('NativeTls')" :loading="loading"
+        >请求 native-tls</n-button
+      >
       <n-button @click="clear">清空</n-button>
     </div>
 

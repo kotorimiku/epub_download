@@ -124,7 +124,7 @@ impl Downloader {
             self.app_handle.as_ref(),
             &format!(
                 "开始下载{}，{}",
-                &self.book_id,
+                self.book_id,
                 self.book_info.title.as_ref().unwrap()
             ),
         );
@@ -325,7 +325,7 @@ impl Downloader {
         epub_builder.save_file(path.as_path())?;
         send(
             self.app_handle.as_ref(),
-            &format!("\n  下载完成，保存到: {}", &path.display()),
+            &format!("\n  下载完成，保存到: {}", path.display()),
         );
         Ok(())
     }

@@ -35,7 +35,7 @@ impl BiliNovel {
     pub async fn get_vol_desc(&self, url: &str) -> Result<Option<String>> {
         let html = self
             .client
-            .get_html(&url, self.app_handle.as_ref(), 0)
+            .get_html(url, self.app_handle.as_ref(), 0)
             .await?;
         let desc = parse_vol_desc(&html);
         Ok(desc)
@@ -66,7 +66,7 @@ impl BiliNovel {
                 .get_next_chapter_url(
                     &self
                         .client
-                        .get_html(&url, self.app_handle.as_ref(), sleep_time)
+                        .get_html(url, self.app_handle.as_ref(), sleep_time)
                         .await?,
                     sleep_time,
                 )
