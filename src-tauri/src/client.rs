@@ -110,6 +110,17 @@ impl BiliClient {
         })
     }
 
+    pub fn new_from_config(config: &crate::config::Config) -> Result<Self> {
+        Self::new(
+            &config.base_url,
+            &config.cookie,
+            &config.user_agent,
+            &config.headers,
+            config.convert_simple_chinese,
+            config.debug,
+        )
+    }
+
     pub async fn get(&self, url: &str) -> Result<String> {
         if let Ok(res) = self.client.get(url).send().await {
             Ok(res.text().await?)
@@ -274,16 +285,9 @@ mod tests {
 
     #[tokio::test]
     async fn download_test() {
-        let client = BiliClient::new(
-            "https://www.bilinovel.com",
-            "",
-            "",
-            &HashMap::new(),
-            false,
-            false,
-        );
+        let config = crate::config::Config::default();
+        let client = BiliClient::new_from_config(&config).unwrap();
         let result = client
-            .unwrap()
             .get("https://www.bilinovel.com/novel/115/catalog")
             .await
             .unwrap();

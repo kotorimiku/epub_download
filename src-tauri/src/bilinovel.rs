@@ -196,15 +196,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_chapterlog_version() {
         let config = Config::default();
-        let client = BiliClient::new(
-            config.base_url.as_str(),
-            config.cookie.as_str(),
-            config.user_agent.as_str(),
-            &config.headers,
-            config.convert_simple_chinese,
-            config.debug,
-        )
-        .unwrap();
+        let client = BiliClient::new_from_config(&config).unwrap();
         let html = client
             .get("https://www.bilinovel.com/novel/1/108523.html")
             .await

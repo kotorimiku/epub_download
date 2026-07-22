@@ -35,6 +35,26 @@ pub struct DownloaderConfig {
     pub debug: bool,
 }
 
+impl DownloaderConfig {
+    pub fn new(config: &crate::config::Config, book_id: String, app_handle: Option<App>) -> Self {
+        Self {
+            base_url: config.base_url.clone(),
+            book_id,
+            output: config.output.clone(),
+            template: config.template.clone(),
+            sleep_time: config.sleep_time,
+            convert_simple_chinese: config.convert_simple_chinese,
+            cookie: config.cookie.clone(),
+            user_agent: config.user_agent.clone(),
+            header_map: config.headers.clone(),
+            add_catalog: config.add_catalog,
+            error_img: config.error_img.clone(),
+            app_handle,
+            debug: config.debug,
+        }
+    }
+}
+
 pub struct Downloader {
     pub base_url: String,
     pub book_id: String,

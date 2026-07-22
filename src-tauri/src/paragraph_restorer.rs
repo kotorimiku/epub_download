@@ -180,15 +180,7 @@ mod tests {
     async fn test_paragraph_restorer() {
         let config = config::Config::default();
 
-        let client = client::BiliClient::new(
-            config.base_url.as_str(),
-            config.cookie.as_str(),
-            config.user_agent.as_str(),
-            &config.headers,
-            config.convert_simple_chinese,
-            config.debug,
-        )
-        .unwrap();
+        let client = client::BiliClient::new_from_config(&config).unwrap();
 
         let html = client
             .get("https://www.bilinovel.com/novel/1/2.html")

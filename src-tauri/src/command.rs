@@ -26,21 +26,7 @@ pub async fn get_book_info(
     let downloader_config = {
         let config = config.read();
 
-        DownloaderConfig {
-            base_url: config.base_url.clone(),
-            book_id,
-            output: config.output.clone(),
-            template: config.template.clone(),
-            sleep_time: config.sleep_time,
-            convert_simple_chinese: config.convert_simple_chinese,
-            cookie: config.cookie.clone(),
-            user_agent: config.user_agent.clone(),
-            header_map: config.headers.clone(),
-            add_catalog: config.add_catalog,
-            error_img: config.error_img.clone(),
-            app_handle: Some(app),
-            debug: config.debug,
-        }
+        DownloaderConfig::new(&config, book_id, Some(app))
     }; // config 在这里自动 drop 释放锁
 
     let result = Downloader::new(downloader_config).await?;
@@ -63,21 +49,7 @@ pub async fn download(
 ) -> Result<()> {
     let downloader_config = {
         let config = config.read();
-        DownloaderConfig {
-            base_url: config.base_url.clone(),
-            book_id,
-            output: config.output.clone(),
-            template: config.template.clone(),
-            sleep_time: config.sleep_time,
-            convert_simple_chinese: config.convert_simple_chinese,
-            cookie: config.cookie.clone(),
-            user_agent: config.user_agent.clone(),
-            header_map: config.headers.clone(),
-            add_catalog: config.add_catalog,
-            error_img: config.error_img.clone(),
-            app_handle: Some(app),
-            debug: config.debug,
-        }
+        DownloaderConfig::new(&config, book_id, Some(app))
     };
 
     // 创建取消接收器
