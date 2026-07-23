@@ -7,7 +7,6 @@ use semver::Version;
 use crate::error::Result;
 
 pub fn t2s(str: &str) -> String {
-    // traditional_to_simplified(str).to_string()
     convert(str)
 }
 

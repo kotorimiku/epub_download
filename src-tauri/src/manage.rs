@@ -1,18 +1,16 @@
 use std::{collections::HashMap, fs::File, io::Read};
 
+use bilinovel::{
+    BiliClient,
+    model::{Book, Volume},
+    parse::parse_last_update,
+};
 use quick_xml::de::from_str;
 use serde::Deserialize;
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-use crate::{
-    bail,
-    client::BiliClient,
-    err,
-    error::Result,
-    model::{Book, Volume},
-    parse::parse_last_update,
-};
+use crate::{bail, err, error::Result};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename = "package", rename_all = "lowercase")]
@@ -176,7 +174,9 @@ pub async fn get_last_update_by_with_volume(
     book_id: &str,
     volume_id: &str,
 ) -> Result<String> {
-    let html = client.get_volume(book_id, volume_id, None).await?;
+    let html = client
+        .get_volume(book_id, volume_id, None::<&fn(&str)>)
+        .await?;
     let last_update = parse_last_update(&html).ok_or(err!("last_update is required"))?;
     Ok(last_update)
 }

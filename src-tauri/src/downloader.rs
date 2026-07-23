@@ -5,18 +5,17 @@ use std::{
     thread::sleep,
 };
 
+use bilinovel::{
+    BiliClient, BiliNovel, BookInfo, Content, HtmlRestoreCallback, MessageCallback, VolumeInfo,
+    secret::decode_text, utils::remove_invalid_chars,
+};
 use regex::Regex;
 
 use crate::{
     bail,
-    bilinovel::BiliNovel,
-    client::*,
     epub_builder::{Body, ContentBlock, EpubBuilder, Metadata, MetadataConfig},
     error::Result,
-    message::{self, print, send},
-    model::{App, BookInfo, Content, VolumeInfo},
-    secret::decode_text,
-    utils::remove_invalid_chars,
+    message::{self, App, print, send},
 };
 
 pub struct DownloaderConfig {
@@ -55,7 +54,7 @@ impl DownloaderConfig {
     }
 }
 
-pub struct Downloader {
+pub struct Downloader<F = fn(&str), H = fn(&str) -> Result<String>> {
     pub base_url: String,
     pub book_id: String,
     pub client: BiliClient,
@@ -68,11 +67,15 @@ pub struct Downloader {
     pub error_img: HashSet<String>,
     pub app_handle: Option<App>,
     pub debug: bool,
-    pub bilinovel: BiliNovel,
+    pub bilinovel: BiliNovel<F, H>,
 }
 
-impl Downloader {
-    pub async fn new(config: DownloaderConfig) -> Result<Self> {
+impl<F: MessageCallback, H: HtmlRestoreCallback> Downloader<F, H> {
+    pub async fn new_with_cb(
+        config: DownloaderConfig,
+        on_message: Option<F>,
+        restore_html: Option<H>,
+    ) -> Result<Self> {
         let client = BiliClient::new(
             &config.base_url,
             &config.cookie,
@@ -81,7 +84,7 @@ impl Downloader {
             config.convert_simple_chinese,
             config.debug,
         )?;
-        let bilinovel = BiliNovel::new(client.clone(), config.app_handle.clone(), config.debug);
+        let bilinovel = BiliNovel::new(client.clone(), on_message, restore_html, config.debug);
         let book_info = bilinovel.get_book_info(&config.book_id).await?;
         if book_info.title.is_none() {
             bail!("Book not found");
@@ -103,6 +106,12 @@ impl Downloader {
             bilinovel,
         })
     }
+}
+
+impl Downloader<fn(&str), fn(&str) -> Result<String>> {
+    pub async fn new(config: DownloaderConfig) -> Result<Self> {
+        Self::new_with_cb(config, None, None).await
+    }
 
     pub fn new_from(
         config: DownloaderConfig,
@@ -117,7 +126,7 @@ impl Downloader {
             config.convert_simple_chinese,
             config.debug,
         )?;
-        let bilinovel = BiliNovel::new(client.clone(), config.app_handle.clone(), config.debug);
+        let bilinovel = BiliNovel::new(client.clone(), None, None, config.debug);
         Ok(Self {
             base_url: config.base_url,
             book_id: config.book_id,
@@ -132,6 +141,17 @@ impl Downloader {
             app_handle: config.app_handle,
             debug: config.debug,
             bilinovel,
+        })
+    }
+}
+
+impl<F: MessageCallback, H: HtmlRestoreCallback> Downloader<F, H> {
+    fn message_cb(&self) -> Option<impl MessageCallback + '_> {
+        self.app_handle.as_ref().map(|_app| {
+            move |_msg: &str| {
+                #[cfg(feature = "gui")]
+                crate::event::message(_app, _msg);
+            }
         })
     }
 
@@ -399,7 +419,7 @@ impl Downloader {
             for _ in 0..50 {
                 match self
                     .client
-                    .get_img_bytes(&img_url_list[i], self.app_handle.as_ref())
+                    .get_img_bytes(&img_url_list[i], self.message_cb().as_ref())
                     .await
                 {
                     Ok(data) => {
@@ -514,7 +534,7 @@ impl Downloader {
     ) -> Result<String> {
         let html = self
             .client
-            .get_html(url, self.app_handle.as_ref(), self.sleep_time)
+            .get_html(url, self.message_cb().as_ref(), self.sleep_time)
             .await?;
 
         let chapter = self.bilinovel.paragraph_restorer(&html, img_list, url)?;
@@ -552,7 +572,7 @@ impl Downloader {
             send(self.app_handle.as_ref(), "   正在下载分页");
             let html = self
                 .client
-                .get_html(&current_url, self.app_handle.as_ref(), self.sleep_time)
+                .get_html(&current_url, self.message_cb().as_ref(), self.sleep_time)
                 .await?;
 
             let chapter = self

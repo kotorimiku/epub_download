@@ -1,7 +1,7 @@
 use serde::{self, Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "gui", derive(specta::Type))]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct BookInfo {
     pub title: Option<String>,
     pub author: Option<String>,
@@ -12,7 +12,7 @@ pub struct BookInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "gui", derive(specta::Type))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct VolumeInfo {
     pub title: Option<String>,
     pub chapter_list: Vec<String>,
@@ -23,7 +23,7 @@ pub struct VolumeInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "gui", derive(specta::Type))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Book {
     pub id: String,
     pub title: Option<String>,
@@ -35,7 +35,7 @@ pub struct Book {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "gui", derive(specta::Type))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Volume {
     pub id: String,
     pub title: Option<String>,
@@ -61,9 +61,3 @@ impl Content {
         matches!(self, Content::Text(text) if text.is_empty())
     }
 }
-
-#[cfg(feature = "gui")]
-pub type App = tauri::AppHandle;
-
-#[cfg(not(feature = "gui"))]
-pub type App = ();

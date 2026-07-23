@@ -173,14 +173,20 @@ impl ParagraphRestorer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{client, config, parse};
+    use crate::{client, parse};
 
     #[ignore]
     #[tokio::test]
     async fn test_paragraph_restorer() {
-        let config = config::Config::default();
-
-        let client = client::BiliClient::new_from_config(&config).unwrap();
+        let client = client::BiliClient::new(
+            "https://www.bilinovel.com",
+            "",
+            "",
+            &std::collections::HashMap::new(),
+            false,
+            false,
+        )
+        .unwrap();
 
         let html = client
             .get("https://www.bilinovel.com/novel/1/2.html")

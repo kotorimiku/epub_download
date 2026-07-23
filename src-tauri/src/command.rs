@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use bilinovel::{Book, BookInfo, VolumeInfo};
 use parking_lot::RwLock;
 use tauri::{AppHandle, State, ipc::Channel};
 use tokio::sync::broadcast;
@@ -8,7 +9,6 @@ use crate::{
     config::Config,
     downloader::{Downloader, DownloaderConfig},
     error::CommandError,
-    model::{Book, BookInfo, VolumeInfo},
 };
 
 type Result<T> = std::result::Result<T, CommandError>;
@@ -91,7 +91,7 @@ pub async fn browser_url(url: String, config: State<'_, RwLock<Config>>) -> Resu
         )
     };
     let client =
-        crate::client::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false, false)?;
+        bilinovel::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false, false)?;
     let result = client.get(&url).await?;
     Ok(result)
 }
@@ -120,8 +120,8 @@ pub async fn request_img(
     };
 
     let client =
-        crate::client::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false, false)?;
-    let result = client.get_img_bytes(&url, None).await?;
+        bilinovel::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false, false)?;
+    let result = client.get_img_bytes(&url, None::<&fn(&str)>).await?;
     channel.send(result)?;
     Ok(())
 }
@@ -144,7 +144,7 @@ pub async fn get_config_vue(config: State<'_, RwLock<Config>>) -> Result<Config>
 #[tauri::command]
 #[specta::specta]
 pub async fn check_update() -> Result<String> {
-    let client = crate::client::BiliClient::new(
+    let client = bilinovel::BiliClient::new(
         "https://www.bilinovel.com",
         "",
         "",

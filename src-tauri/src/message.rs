@@ -1,4 +1,8 @@
-use crate::model::App;
+#[cfg(feature = "gui")]
+pub type App = tauri::AppHandle;
+
+#[cfg(not(feature = "gui"))]
+pub type App = ();
 
 pub fn send(_app: Option<&App>, msg: &str) {
     #[cfg(feature = "gui")]

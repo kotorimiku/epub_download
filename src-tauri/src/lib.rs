@@ -1,24 +1,18 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-pub mod bilinovel;
+pub use bilinovel as core;
+pub use bilinovel::{BiliClient, BiliNovel};
+
 pub mod cli;
-pub mod client;
 pub mod config;
 pub mod downloader;
 pub mod epub_builder;
 pub mod error;
 pub mod manage;
 pub mod message;
-pub mod model;
-pub mod paragraph_restorer;
-pub mod parse;
 pub mod runtime;
-pub mod secret;
-pub mod utils;
 
-pub use bilinovel::BiliNovel;
 pub use cli::run_cli;
-pub use client::BiliClient;
 pub use config::Config;
+pub use error::{CommandError, Result};
 
 #[cfg(feature = "gui")]
 pub mod command;

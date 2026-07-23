@@ -227,12 +227,16 @@ mod tests {
     #[ignore]
     #[tokio::test]
     async fn test_parse_last_update() {
-        let config = crate::config::Config::default();
-        let html = client::BiliClient::new_from_config(&config)
-            .unwrap()
-            .get_novel("1", None)
-            .await
-            .unwrap();
+        let client = client::BiliClient::new(
+            "https://www.bilinovel.com",
+            "",
+            "",
+            &std::collections::HashMap::new(),
+            false,
+            false,
+        )
+        .unwrap();
+        let html = client.get_novel("1", None::<&fn(&str)>).await.unwrap();
         let last_update = parse_last_update(&html);
         println!("last_update: {:?}", last_update);
     }
