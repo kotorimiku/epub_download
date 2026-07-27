@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { emit } from '@tauri-apps/api/event';
 import { NInput, NButton } from 'naive-ui';
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 
 import { commands } from '@/bindings';
 import { useRunCommand } from '@/composables/useRunCommand';
@@ -11,11 +11,26 @@ import { restoreHtml } from '../utils/event';
 
 const iframe = ref<HTMLIFrameElement | null>(null);
 const url = ref<string>('');
+const baseUrl = ref<string>('https://www.bilinovel.com');
 const pendingRequestId = ref<string>('');
 
 let restore: (() => void) | null = null;
 
 const runCommand = useRunCommand();
+
+const loadConfig = async () => {
+  try {
+    const config = await runCommand({ command: commands.getConfigVue });
+    if (config?.baseUrl) {
+      baseUrl.value = config.baseUrl;
+      if (!url.value) {
+        url.value = config.baseUrl;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load config:', e);
+  }
+};
 
 const getHtml = (url: string) => {
   if (!url) return;
@@ -29,6 +44,8 @@ const getHtml = (url: string) => {
 };
 
 onMounted(async () => {
+  await loadConfig();
+
   const waitForAcontentRestored = async (doc: Document): Promise<void> => {
     const target = doc.getElementById('acontent');
     if (!target) return;
@@ -101,7 +118,7 @@ onMounted(async () => {
     });
   };
 
-  // 重写iframe的srcdoc属性，自动注入修改navigator.platform的脚本
+  // 重写iframe的srcdoc属性，自动注入修改navigator.platform的脚本及设置<base>标签
   const originalSrcdocDescriptor = Object.getOwnPropertyDescriptor(
     HTMLIFrameElement.prototype,
     'srcdoc',
@@ -122,6 +139,16 @@ onMounted(async () => {
       // 创建一个临时 DOM 解析器
       const parser = new DOMParser();
       const doc = parser.parseFromString(modifiedHtml, 'text/html');
+
+      // 设置/更新 <base> 标签的 href 为设置的 baseUrl
+      let baseEl = doc.querySelector('base');
+      if (!baseEl) {
+        baseEl = doc.createElement('base');
+        doc.head.prepend(baseEl);
+      }
+      if (baseUrl.value) {
+        baseEl.setAttribute('href', baseUrl.value);
+      }
 
       // 创建脚本节点，修改 navigator.platform
       const script = doc.createElement('script');
