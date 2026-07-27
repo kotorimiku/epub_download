@@ -103,7 +103,10 @@ impl BiliClient {
         debug: bool,
     ) -> Result<Self> {
         let headers = get_headers(base_url, cookie, user_agent, header_map)?;
-        let client = Client::builder().default_headers(headers).build()?;
+        let client = Client::builder()
+            .default_headers(headers)
+            .cookie_store(true)
+            .build()?;
         let base_url = Url::parse(base_url)?;
         Ok(Self {
             client,
