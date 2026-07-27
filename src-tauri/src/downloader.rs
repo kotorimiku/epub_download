@@ -6,8 +6,8 @@ use std::{
 };
 
 use bilinovel::{
-    BiliClient, BiliNovel, BookInfo, Content, HtmlRestoreCallback, MessageCallback, VolumeInfo,
-    secret::decode_text, utils::remove_invalid_chars,
+    BiliClient, BiliNovel, BookInfo, Content, MessageCallback, VolumeInfo, secret::decode_text,
+    utils::remove_invalid_chars,
 };
 use regex::Regex;
 
@@ -54,7 +54,7 @@ impl DownloaderConfig {
     }
 }
 
-pub struct Downloader<F = fn(&str), H = fn(&str) -> Result<String>> {
+pub struct Downloader<F = fn(&str)> {
     pub base_url: String,
     pub book_id: String,
     pub client: BiliClient,
@@ -67,15 +67,11 @@ pub struct Downloader<F = fn(&str), H = fn(&str) -> Result<String>> {
     pub error_img: HashSet<String>,
     pub app_handle: Option<App>,
     pub debug: bool,
-    pub bilinovel: BiliNovel<F, H>,
+    pub bilinovel: BiliNovel<F>,
 }
 
-impl<F: MessageCallback, H: HtmlRestoreCallback> Downloader<F, H> {
-    pub async fn new_with_cb(
-        config: DownloaderConfig,
-        on_message: Option<F>,
-        restore_html: Option<H>,
-    ) -> Result<Self> {
+impl Downloader {
+    pub async fn new(config: DownloaderConfig) -> Result<Downloader<impl MessageCallback>> {
         let client = BiliClient::new(
             &config.base_url,
             &config.cookie,
@@ -84,13 +80,21 @@ impl<F: MessageCallback, H: HtmlRestoreCallback> Downloader<F, H> {
             config.convert_simple_chinese,
             config.debug,
         )?;
-        let bilinovel = BiliNovel::new(client.clone(), on_message, restore_html, config.debug);
+
+        let on_message = config.app_handle.clone().map(|_app| {
+            move |msg: &str| {
+                #[cfg(feature = "gui")]
+                crate::event::message(&_app, msg);
+            }
+        });
+
+        let bilinovel = BiliNovel::new(client.clone(), on_message);
         let book_info = bilinovel.get_book_info(&config.book_id).await?;
         if book_info.title.is_none() {
             bail!("Book not found");
         }
         let volume_infos = bilinovel.get_volume_list(&config.book_id).await?;
-        Ok(Self {
+        Ok(Downloader {
             base_url: config.base_url,
             book_id: config.book_id,
             client,
@@ -105,19 +109,13 @@ impl<F: MessageCallback, H: HtmlRestoreCallback> Downloader<F, H> {
             debug: config.debug,
             bilinovel,
         })
-    }
-}
-
-impl Downloader<fn(&str), fn(&str) -> Result<String>> {
-    pub async fn new(config: DownloaderConfig) -> Result<Self> {
-        Self::new_with_cb(config, None, None).await
     }
 
     pub fn new_from(
         config: DownloaderConfig,
         book_info: BookInfo,
         volume_infos: Vec<VolumeInfo>,
-    ) -> Result<Self> {
+    ) -> Result<Downloader<impl MessageCallback>> {
         let client = BiliClient::new(
             &config.base_url,
             &config.cookie,
@@ -126,8 +124,14 @@ impl Downloader<fn(&str), fn(&str) -> Result<String>> {
             config.convert_simple_chinese,
             config.debug,
         )?;
-        let bilinovel = BiliNovel::new(client.clone(), None, None, config.debug);
-        Ok(Self {
+        let on_message = config.app_handle.clone().map(|_app| {
+            move |msg: &str| {
+                #[cfg(feature = "gui")]
+                crate::event::message(&_app, msg);
+            }
+        });
+        let bilinovel = BiliNovel::new(client.clone(), on_message);
+        Ok(Downloader {
             base_url: config.base_url,
             book_id: config.book_id,
             client,
@@ -145,7 +149,7 @@ impl Downloader<fn(&str), fn(&str) -> Result<String>> {
     }
 }
 
-impl<F: MessageCallback, H: HtmlRestoreCallback> Downloader<F, H> {
+impl<F: MessageCallback> Downloader<F> {
     fn message_cb(&self) -> Option<impl MessageCallback + '_> {
         self.app_handle.as_ref().map(|_app| {
             move |_msg: &str| {
@@ -537,7 +541,7 @@ impl<F: MessageCallback, H: HtmlRestoreCallback> Downloader<F, H> {
             .get_html(url, self.message_cb().as_ref(), self.sleep_time)
             .await?;
 
-        let chapter = self.bilinovel.paragraph_restorer(&html, img_list, url)?;
+        let chapter = self.paragraph_restorer(&html, img_list, url)?;
 
         chapter_text.extend(chapter);
 
@@ -575,14 +579,25 @@ impl<F: MessageCallback, H: HtmlRestoreCallback> Downloader<F, H> {
                 .get_html(&current_url, self.message_cb().as_ref(), self.sleep_time)
                 .await?;
 
-            let chapter = self
-                .bilinovel
-                .paragraph_restorer(&html, img_list, &current_url)?;
+            let chapter = self.paragraph_restorer(&html, img_list, &current_url)?;
 
             chapter_text.extend(chapter);
 
             current_url = self.bilinovel.get_next_url(&html)?;
         }
         Ok(current_url)
+    }
+
+    fn paragraph_restorer(
+        &self,
+        html: &str,
+        img_list: &mut Vec<String>,
+        url: &str,
+    ) -> Result<Vec<Content>> {
+        let app_handler = self.app_handle.as_ref().unwrap();
+        let html_restore_callback =
+            |html: &str| -> Result<String> { crate::event::html(app_handler, html) };
+        self.bilinovel
+            .paragraph_restorer(html, img_list, url, Some(html_restore_callback))
     }
 }

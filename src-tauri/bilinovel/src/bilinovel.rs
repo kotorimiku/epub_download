@@ -1,38 +1,24 @@
-use std::borrow::Cow;
-
 use regex::Regex;
 
 use crate::{
     bail,
     client::BiliClient,
     error::Result,
-    listener::{HtmlRestoreCallback, MessageCallback},
+    listener::MessageCallback,
     model::{BookInfo, Content, VolumeInfo},
     paragraph_restorer::ParagraphRestorer,
     parse::{parse_metadata, parse_novel_text, parse_vol_desc, parse_volume_list},
 };
 
 #[derive(Clone)]
-pub struct BiliNovel<F = fn(&str), H = fn(&str) -> Result<String>> {
+pub struct BiliNovel<F = fn(&str)> {
     client: BiliClient,
     on_message: Option<F>,
-    restore_html: Option<H>,
-    debug: bool,
 }
 
-impl<F: MessageCallback, H: HtmlRestoreCallback> BiliNovel<F, H> {
-    pub fn new(
-        client: BiliClient,
-        on_message: Option<F>,
-        restore_html: Option<H>,
-        debug: bool,
-    ) -> Self {
-        Self {
-            client,
-            on_message,
-            restore_html,
-            debug,
-        }
+impl<F: MessageCallback> BiliNovel<F> {
+    pub fn new(client: BiliClient, on_message: Option<F>) -> Self {
+        Self { client, on_message }
     }
 
     fn send_msg(&self, msg: &str) {
@@ -124,24 +110,18 @@ impl<F: MessageCallback, H: HtmlRestoreCallback> BiliNovel<F, H> {
         &self,
         html: &str,
         img_list: &mut Vec<String>,
-        _url: &str,
+        url: &str,
+        html_restore_callback: Option<impl Fn(&str) -> Result<String>>,
     ) -> Result<Vec<Content>> {
-        let html_cow = if let Some(ref restore_fn) = self.restore_html {
-            match restore_fn(html) {
-                Ok(h) => Cow::Owned(h),
-                Err(err) => {
-                    if self.debug {
-                        self.send_msg(html);
-                    }
-                    bail!("章节内容解析失败: {:?}", err);
-                }
-            }
-        } else {
-            Cow::Borrowed(html)
-        };
-
         let mut chapter = Vec::new();
-        parse_novel_text(html_cow.as_ref(), &mut chapter, img_list);
+
+        if let Some(callback) = html_restore_callback {
+            let restored_html = callback(html)?;
+            parse_novel_text(&restored_html, &mut chapter, img_list);
+            return Ok(chapter);
+        }
+
+        parse_novel_text(html, &mut chapter, img_list);
 
         if chapter.is_empty() {
             self.send_msg("   章节内容为空");
@@ -149,29 +129,24 @@ impl<F: MessageCallback, H: HtmlRestoreCallback> BiliNovel<F, H> {
             bail!("章节内容为空");
         }
 
-        if self.restore_html.is_some() {
-            Ok(chapter)
-        } else {
-            if Self::get_chapterlog_version(html_cow.as_ref())? != ParagraphRestorer::get_version()
-            {
-                bail!("章节日志版本不匹配，无法恢复章节顺序");
-            }
-            let chapter_id = _url
-                .split("/")
-                .last()
-                .unwrap()
-                .split(".")
-                .next()
-                .unwrap()
-                .split("_")
-                .next()
-                .unwrap()
-                .parse::<u64>()
-                .unwrap();
-
-            let restorer = ParagraphRestorer::new(chapter_id);
-            Ok(restorer.restore(chapter))
+        if Self::get_chapterlog_version(html)? != ParagraphRestorer::get_version() {
+            bail!("章节日志版本不匹配，无法恢复章节顺序");
         }
+        let chapter_id = url
+            .split("/")
+            .last()
+            .unwrap()
+            .split(".")
+            .next()
+            .unwrap()
+            .split("_")
+            .next()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap();
+
+        let restorer = ParagraphRestorer::new(chapter_id);
+        Ok(restorer.restore(chapter))
     }
 
     fn get_chapterlog_version(html: &str) -> Result<String> {

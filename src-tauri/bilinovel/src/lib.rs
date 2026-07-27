@@ -11,5 +11,5 @@ pub mod utils;
 pub use bilinovel::BiliNovel;
 pub use client::BiliClient;
 pub use error::Result;
-pub use listener::{HtmlRestoreCallback, MessageCallback};
+pub use listener::MessageCallback;
 pub use model::{Book, BookInfo, Content, Volume, VolumeInfo};
