@@ -1,6 +1,6 @@
 [package]
 name = "epub_download"
-version = "1.4.14"
+version = "1.4.15"
 description = "bilinovel downloader"
 authors = ["kotorimiku"]
 edition = "2024"

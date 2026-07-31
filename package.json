@@ -1,6 +1,6 @@
 {
   "name": "epub_download",
-  "version": "0.1.0",
+  "version": "1.4.15",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,8 @@
     "type-check": "vue-tsc --noEmit",
     "cargo": "cd src-tauri && cargo",
     "check": "cd src-tauri && cargo check",
-    "clippy": "cd src-tauri && cargo clippy"
+    "clippy": "cd src-tauri && cargo clippy",
+    "release": "bumpp package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml --all"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.0",
@@ -27,6 +28,7 @@
     "@types/node": "^25.6.0",
     "@vicons/fluent": "^0.13.0",
     "@vitejs/plugin-vue": "^6.0.6",
+    "bumpp": "^12.1.1",
     "naive-ui": "^2.44.1",
     "oxfmt": "^0.47.0",
     "oxlint": "^1.62.0",
