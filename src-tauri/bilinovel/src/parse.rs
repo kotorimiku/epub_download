@@ -70,12 +70,33 @@ pub fn parse_metadata(html: &str) -> BookInfo {
     }
 }
 
+pub fn clean_vol_name(vol_name: &str, book_title: &str) -> String {
+    let name = vol_name.trim();
+    let book_title = book_title.trim();
+
+    if !book_title.is_empty() {
+        if let Some(stripped) = name.strip_prefix(book_title) {
+            let cleaned = stripped.trim();
+            if !cleaned.is_empty() {
+                return cleaned.to_string();
+            }
+        }
+    }
+    name.to_string()
+}
+
 pub fn parse_volume_list(html: &str) -> Vec<VolumeInfo> {
     let document = Html::parse_document(html);
     let ul_selector = Selector::parse("ul").unwrap();
     let li_selector = Selector::parse("li").unwrap();
     let a_selector = Selector::parse("a").unwrap();
     let img_selector = Selector::parse("img").unwrap();
+    let book_title_selector = Selector::parse("h1.book-title, .book-title, h1").unwrap();
+    let book_title = document
+        .select(&book_title_selector)
+        .next()
+        .map(|e| e.text().collect::<String>());
+
     let mut volume_list: Vec<VolumeInfo> = Vec::new();
 
     for element in document.select(&ul_selector) {
@@ -90,7 +111,12 @@ pub fn parse_volume_list(html: &str) -> Vec<VolumeInfo> {
             for element in element.select(&li_selector) {
                 if let Some(property) = element.value().attr("class") {
                     if property == "chapter-bar chapter-li" {
-                        title = Some(element.text().collect::<String>());
+                        let raw_title = element.text().collect::<String>();
+                        let cleaned = clean_vol_name(
+                            &raw_title,
+                            book_title.as_deref().unwrap_or(""),
+                        );
+                        title = Some(cleaned);
                     }
                     if property == "volume-cover chapter-li" {
                         if let Some(element) = element.select(&a_selector).next() {
@@ -240,4 +266,19 @@ mod tests {
         let last_update = parse_last_update(&html);
         println!("last_update: {:?}", last_update);
     }
+
+    #[test]
+    fn test_clean_vol_name() {
+        let book_title = "关于我转生变成史莱姆这档事";
+        assert_eq!(
+            clean_vol_name("关于我转生变成史莱姆这档事 第一卷 序章", book_title),
+            "第一卷 序章"
+        );
+        assert_eq!(
+            clean_vol_name("第一卷", book_title),
+            "第一卷"
+        );
+    }
 }
+
+
