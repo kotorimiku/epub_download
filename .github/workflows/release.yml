@@ -142,6 +142,6 @@ jobs:
           name: Release v${{ needs.get-version.outputs.version }}
           files: |
             artifacts/*
-          draft: true
+          draft: false
           prerelease: false
           generate_release_notes: true
