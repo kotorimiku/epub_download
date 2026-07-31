@@ -78,6 +78,40 @@ pub async fn cancel_download(cancel_sender: State<'_, CancelSender>) -> Result<(
     Ok(())
 }
 
+pub type JsCache = Arc<RwLock<HashMap<String, String>>>;
+
+#[tauri::command]
+#[specta::specta]
+pub async fn fetch_js(
+    url: String,
+    config: State<'_, RwLock<Config>>,
+    cache: State<'_, JsCache>,
+) -> Result<String> {
+    if let Some(content) = cache.read().get(&url) {
+        return Ok(content.clone());
+    }
+
+    let (base_url, cookie, user_agent, header_map) = {
+        let config = config.read();
+        (
+            config.base_url.clone(),
+            config.cookie.clone(),
+            config.user_agent.clone(),
+            config.headers.clone(),
+        )
+    };
+    let client =
+        bilinovel::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false, false)?;
+    let result = client.get(&url).await?;
+    if result.is_empty() || result.contains("Just a moment") {
+        return Err(CommandError(
+            "Failed to fetch JS content, possibly due to anti-scraping measures.".to_string(),
+        ));
+    }
+    cache.write().insert(url, result.clone());
+    Ok(result)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn browser_url(url: String, config: State<'_, RwLock<Config>>) -> Result<String> {

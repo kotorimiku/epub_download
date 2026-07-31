@@ -22,7 +22,7 @@ pub mod event;
 #[cfg(feature = "gui")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    use std::sync::Arc;
+    use std::{collections::HashMap, sync::Arc};
 
     use parking_lot::RwLock;
     use tauri_specta::{Builder, collect_commands};
@@ -33,6 +33,7 @@ pub fn run() {
     // 创建取消通道
     let (cancel_sender, _) = broadcast::channel::<()>(1);
     let cancel_sender = Arc::new(cancel_sender);
+    let js_cache: JsCache = Arc::new(RwLock::new(HashMap::new()));
 
     let builder = Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -40,6 +41,7 @@ pub fn run() {
             download,
             cancel_download,
             browser_url,
+            fetch_js,
             save_config,
             get_config_vue,
             check_update,
@@ -63,6 +65,7 @@ pub fn run() {
         .invoke_handler(builder.invoke_handler())
         .manage(RwLock::new(Config::load()))
         .manage(cancel_sender)
+        .manage(js_cache)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

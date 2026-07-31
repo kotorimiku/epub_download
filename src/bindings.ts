@@ -8,6 +8,7 @@ export const commands = {
 	download: (bookId: string, bookInfo: BookInfo, volumeList: VolumeInfo[], volumeNoList: number[]) => __TAURI_INVOKE<null>("download", { bookId, bookInfo, volumeList, volumeNoList }),
 	cancelDownload: () => __TAURI_INVOKE<null>("cancel_download"),
 	browserUrl: (url: string) => __TAURI_INVOKE<string>("browser_url", { url }),
+	fetchJs: (url: string) => __TAURI_INVOKE<string>("fetch_js", { url }),
 	saveConfig: (newConfig: Config) => __TAURI_INVOKE<null>("save_config", { newConfig }),
 	getConfigVue: () => __TAURI_INVOKE<Config>("get_config_vue"),
 	checkUpdate: () => __TAURI_INVOKE<string>("check_update"),

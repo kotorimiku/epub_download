@@ -23,9 +23,6 @@ const loadConfig = async () => {
     const config = await runCommand({ command: commands.getConfigVue });
     if (config?.baseUrl) {
       baseUrl.value = config.baseUrl;
-      if (!url.value) {
-        url.value = config.baseUrl;
-      }
     }
   } catch (e) {
     console.error('Failed to load config:', e);
@@ -125,7 +122,7 @@ onMounted(async () => {
   );
 
   Object.defineProperty(iframe.value!, 'srcdoc', {
-    set: function (html: string) {
+    set: async function (html: string) {
       // 调整 HTML 确保有 <head>
       let modifiedHtml = html;
       if (!html.includes('<head>')) {
@@ -135,6 +132,37 @@ onMounted(async () => {
           modifiedHtml = `<html><head></head><body>${html}</body></html>`;
         }
       }
+
+      let commonUrl = modifiedHtml.match(/src=["']([^"']*common\.js[^"']*)["']/i)?.[1];
+      if (commonUrl && !commonUrl.startsWith('http')) {
+        commonUrl = new URL(commonUrl, baseUrl.value).href;
+      }
+
+      let chapterlogUrl = modifiedHtml.match(/src=["']([^"']*chapterlog\.js[^"']*)["']/i)?.[1];
+      if (chapterlogUrl && !chapterlogUrl.startsWith('http')) {
+        chapterlogUrl = new URL(chapterlogUrl, baseUrl.value).href;
+      }
+
+      const fetchJsWithRetry = async (targetUrl: string, maxRetries = 50, delayMs = 1000): Promise<string> => {
+        if (!targetUrl) return '';
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            const res = await commands.fetchJs(targetUrl);
+            if (res) return res;
+          } catch (e) {
+            console.warn(`[fetchJs] attempt ${attempt}/${maxRetries} failed for ${targetUrl}:`, e);
+          }
+          if (attempt < maxRetries) {
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+          }
+        }
+        return '';
+      };
+
+      const [common, chapterlog] = await Promise.all([
+        commonUrl ? fetchJsWithRetry(commonUrl, 50, 1000) : Promise.resolve(''),
+        chapterlogUrl ? fetchJsWithRetry(chapterlogUrl, 50, 1000) : Promise.resolve(''),
+      ]);
 
       // 创建一个临时 DOM 解析器
       const parser = new DOMParser();
@@ -150,6 +178,34 @@ onMounted(async () => {
         baseEl.setAttribute('href', baseUrl.value);
       }
 
+      if (chapterlog) {
+        doc.querySelectorAll('script[src*="chapterlog.js"]').forEach((el) => el.remove());
+        const chapterlogScript = doc.createElement('script');
+        chapterlogScript.textContent = chapterlog;
+        doc.body.appendChild(chapterlogScript);
+      }
+
+      if (common) {
+        doc.querySelectorAll('script[src*="common.js"]').forEach((el) => el.remove());
+        const commonScript = doc.createElement('script');
+        commonScript.textContent = common;
+        doc.body.appendChild(commonScript);
+      }
+
+      // 如果 HTML 中存在内联的 chapterlog/common 脚本，将其从原本位置挪到 body 最底部，避免在 #acontent 生成前死锁
+      const scripts = Array.from(doc.querySelectorAll('script'));
+      scripts.forEach((s) => {
+        if (
+          s.textContent &&
+          (s.textContent.includes('acontent') ||
+            s.textContent.includes('ReadParams') ||
+            s.textContent.includes('hisStorageName'))
+        ) {
+          s.remove();
+          doc.body.appendChild(s);
+        }
+      });
+
       // 创建脚本节点，修改 navigator.platform
       const script = doc.createElement('script');
       script.textContent = `
@@ -157,7 +213,7 @@ onMounted(async () => {
         get: function() { return "android"; },
         configurable: true
       });
-    `;
+      `;
 
       // 插入到 <head> 最前面
       doc.head.prepend(script);
@@ -179,9 +235,15 @@ onMounted(async () => {
     if (!doc) return;
 
     const win = doc.defaultView;
-    win?.dispatchEvent(new Event('scroll'));
-    win?.dispatchEvent(new Event('wheel'));
-    doc.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown' }));
+    const triggerEvents = () => {
+      win?.dispatchEvent(new Event('scroll'));
+      win?.dispatchEvent(new Event('wheel'));
+      win?.dispatchEvent(new Event('resize'));
+      doc.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown' }));
+    };
+
+    triggerEvents();
+    setTimeout(triggerEvents, 150);
 
     await waitForAcontentRestored(doc);
 
