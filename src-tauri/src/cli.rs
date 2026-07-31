@@ -58,22 +58,8 @@ pub async fn run_cli() -> Result<()> {
         config.debug = debug;
     }
 
-    let book = Downloader::new(DownloaderConfig {
-        base_url: config.base_url.clone(),
-        book_id: args.book_id,
-        output: config.output.clone(),
-        template: config.template.clone(),
-        sleep_time: config.sleep_time,
-        convert_simple_chinese: config.convert_simple_chinese,
-        cookie: config.cookie.clone(),
-        user_agent: config.user_agent.clone(),
-        header_map: config.headers.clone(),
-        add_catalog: config.add_catalog,
-        error_img: config.error_img.clone(),
-        app_handle: None,
-        debug: config.debug,
-    })
-    .await?;
+    let book = Downloader::new(DownloaderConfig::new(&config, args.book_id, None))
+        .await?;
 
     if args.volume.is_empty() {
         println!("{}", book.book_info.title.unwrap());

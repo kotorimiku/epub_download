@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use bilinovel::{Book, BookInfo, VolumeInfo};
+use bilinovel::{BiliClient, Book, BookInfo, VolumeInfo};
 use parking_lot::RwLock;
 use tauri::{AppHandle, State, ipc::Channel};
 use tokio::sync::broadcast;
@@ -20,13 +20,14 @@ pub type CancelSender = Arc<broadcast::Sender<()>>;
 #[specta::specta]
 pub async fn get_book_info(
     config: State<'_, RwLock<Config>>,
+    client: State<'_, RwLock<BiliClient>>,
     app: AppHandle,
     book_id: String,
 ) -> Result<(BookInfo, Vec<VolumeInfo>)> {
     let downloader_config = {
         let config = config.read();
-
-        DownloaderConfig::new(&config, book_id, Some(app))
+        let client = client.read().clone();
+        DownloaderConfig::new(&config, book_id, Some(app)).with_client(client)
     }; // config 在这里自动 drop 释放锁
 
     let result = Downloader::new(downloader_config).await?;
@@ -38,8 +39,10 @@ pub async fn get_book_info(
 
 #[tauri::command]
 #[specta::specta]
+#[allow(clippy::too_many_arguments)]
 pub async fn download(
     config: State<'_, RwLock<Config>>,
+    client: State<'_, RwLock<BiliClient>>,
     cancel_sender: State<'_, CancelSender>,
     app: AppHandle,
     book_id: String,
@@ -49,7 +52,8 @@ pub async fn download(
 ) -> Result<()> {
     let downloader_config = {
         let config = config.read();
-        DownloaderConfig::new(&config, book_id, Some(app))
+        let client = client.read().clone();
+        DownloaderConfig::new(&config, book_id, Some(app)).with_client(client)
     };
 
     // 创建取消接收器
@@ -84,24 +88,14 @@ pub type JsCache = Arc<RwLock<HashMap<String, String>>>;
 #[specta::specta]
 pub async fn fetch_js(
     url: String,
-    config: State<'_, RwLock<Config>>,
+    client: State<'_, RwLock<BiliClient>>,
     cache: State<'_, JsCache>,
 ) -> Result<String> {
     if let Some(content) = cache.read().get(&url) {
         return Ok(content.clone());
     }
 
-    let (base_url, cookie, user_agent, header_map) = {
-        let config = config.read();
-        (
-            config.base_url.clone(),
-            config.cookie.clone(),
-            config.user_agent.clone(),
-            config.headers.clone(),
-        )
-    };
-    let client =
-        bilinovel::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false, false)?;
+    let client = client.read().clone();
     let result = client.get(&url).await?;
     if result.is_empty() || result.contains("Just a moment") {
         return Err(CommandError(
@@ -114,18 +108,8 @@ pub async fn fetch_js(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn browser_url(url: String, config: State<'_, RwLock<Config>>) -> Result<String> {
-    let (base_url, cookie, user_agent, header_map) = {
-        let config = config.read();
-        (
-            config.base_url.clone(),
-            config.cookie.clone(),
-            config.user_agent.clone(),
-            config.headers.clone(),
-        )
-    };
-    let client =
-        bilinovel::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false, false)?;
+pub async fn browser_url(url: String, client: State<'_, RwLock<BiliClient>>) -> Result<String> {
+    let client = client.read().clone();
     let result = client.get(&url).await?;
     Ok(result)
 }
@@ -141,20 +125,9 @@ pub enum Tls {
 pub async fn request_img(
     url: String,
     channel: Channel<Vec<u8>>,
-    config: State<'_, RwLock<Config>>,
+    client: State<'_, RwLock<BiliClient>>,
 ) -> Result<()> {
-    let (base_url, cookie, user_agent, header_map) = {
-        let config = config.read();
-        (
-            config.base_url.clone(),
-            config.cookie.clone(),
-            config.user_agent.clone(),
-            config.headers.clone(),
-        )
-    };
-
-    let client =
-        bilinovel::BiliClient::new(&base_url, &cookie, &user_agent, &header_map, false, false)?;
+    let client = client.read().clone();
     let result = client.get_img_bytes(&url, None::<&fn(&str)>).await?;
     channel.send(result)?;
     Ok(())
@@ -162,10 +135,29 @@ pub async fn request_img(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn save_config(config: State<'_, RwLock<Config>>, new_config: Config) -> Result<()> {
-    let mut config = config.write();
-    *config = new_config;
-    Ok(config.save()?)
+pub async fn save_config(
+    config: State<'_, RwLock<Config>>,
+    client: State<'_, RwLock<BiliClient>>,
+    new_config: Config,
+) -> Result<()> {
+    let new_client = bilinovel::BiliClient::new(
+        &new_config.base_url,
+        &new_config.cookie,
+        &new_config.user_agent,
+        &new_config.headers,
+        new_config.convert_simple_chinese,
+        new_config.debug,
+    )?;
+    {
+        let mut config = config.write();
+        *config = new_config;
+        config.save()?;
+    }
+    {
+        let mut client = client.write();
+        *client = new_client;
+    }
+    Ok(())
 }
 
 #[tauri::command]

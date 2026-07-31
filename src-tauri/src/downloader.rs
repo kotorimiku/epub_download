@@ -32,6 +32,7 @@ pub struct DownloaderConfig {
     pub error_img: HashSet<String>,
     pub app_handle: Option<App>,
     pub debug: bool,
+    pub client: Option<BiliClient>,
 }
 
 impl DownloaderConfig {
@@ -50,7 +51,13 @@ impl DownloaderConfig {
             error_img: config.error_img.clone(),
             app_handle,
             debug: config.debug,
+            client: None,
         }
+    }
+
+    pub fn with_client(mut self, client: BiliClient) -> Self {
+        self.client = Some(client);
+        self
     }
 }
 
@@ -72,14 +79,17 @@ pub struct Downloader<F = fn(&str)> {
 
 impl Downloader {
     pub async fn new(config: DownloaderConfig) -> Result<Downloader<impl MessageCallback>> {
-        let client = BiliClient::new(
-            &config.base_url,
-            &config.cookie,
-            &config.user_agent,
-            &config.header_map,
-            config.convert_simple_chinese,
-            config.debug,
-        )?;
+        let client = match config.client.clone() {
+            Some(c) => c,
+            None => BiliClient::new(
+                &config.base_url,
+                &config.cookie,
+                &config.user_agent,
+                &config.header_map,
+                config.convert_simple_chinese,
+                config.debug,
+            )?,
+        };
 
         let on_message = config.app_handle.clone().map(|_app| {
             move |msg: &str| {
@@ -116,14 +126,17 @@ impl Downloader {
         book_info: BookInfo,
         volume_infos: Vec<VolumeInfo>,
     ) -> Result<Downloader<impl MessageCallback>> {
-        let client = BiliClient::new(
-            &config.base_url,
-            &config.cookie,
-            &config.user_agent,
-            &config.header_map,
-            config.convert_simple_chinese,
-            config.debug,
-        )?;
+        let client = match config.client.clone() {
+            Some(c) => c,
+            None => BiliClient::new(
+                &config.base_url,
+                &config.cookie,
+                &config.user_agent,
+                &config.header_map,
+                config.convert_simple_chinese,
+                config.debug,
+            )?,
+        };
         let on_message = config.app_handle.clone().map(|_app| {
             move |msg: &str| {
                 #[cfg(feature = "gui")]

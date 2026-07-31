@@ -60,10 +60,22 @@ pub fn run() {
         )
         .expect("Failed to export typescript bindings");
 
+    let config = Config::load();
+    let client = BiliClient::new(
+        &config.base_url,
+        &config.cookie,
+        &config.user_agent,
+        &config.headers,
+        config.convert_simple_chinese,
+        config.debug,
+    )
+    .expect("Failed to initialize BiliClient");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(builder.invoke_handler())
-        .manage(RwLock::new(Config::load()))
+        .manage(RwLock::new(config))
+        .manage(RwLock::new(client))
         .manage(cancel_sender)
         .manage(js_cache)
         .run(tauri::generate_context!())
