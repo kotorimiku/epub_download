@@ -143,7 +143,11 @@ onMounted(async () => {
         chapterlogUrl = new URL(chapterlogUrl, baseUrl.value).href;
       }
 
-      const fetchJsWithRetry = async (targetUrl: string, maxRetries = 50, delayMs = 1000): Promise<string> => {
+      const fetchJsWithRetry = async (
+        targetUrl: string,
+        maxRetries = 50,
+        delayMs = 1000,
+      ): Promise<string> => {
         if (!targetUrl) return '';
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
           try {

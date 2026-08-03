@@ -26,4 +26,3 @@ pub async fn check_update() -> Result<String> {
         Ok(format!("已是最新版本: {}", version))
     }
 }
-

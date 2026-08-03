@@ -58,8 +58,7 @@ pub async fn run_cli() -> Result<()> {
         config.debug = debug;
     }
 
-    let book = Downloader::new(DownloaderConfig::new(&config, args.book_id, None))
-        .await?;
+    let book = Downloader::new(DownloaderConfig::new(&config, args.book_id, None)).await?;
 
     if args.volume.is_empty() {
         println!("{}", book.book_info.title.unwrap());
