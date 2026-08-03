@@ -170,15 +170,7 @@ pub async fn get_config_vue(config: State<'_, RwLock<Config>>) -> Result<Config>
 #[tauri::command]
 #[specta::specta]
 pub async fn check_update() -> Result<String> {
-    let client = bilinovel::BiliClient::new(
-        "https://www.bilinovel.com",
-        "",
-        "",
-        &HashMap::new(),
-        false,
-        false,
-    )?;
-    let result = client.check_update().await?;
+    let result = crate::client::check_update().await?;
     Ok(result)
 }
 

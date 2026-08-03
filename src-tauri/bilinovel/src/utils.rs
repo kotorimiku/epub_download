@@ -2,7 +2,6 @@ use std::io::Cursor;
 
 use fast2s::convert;
 use image::{ImageFormat, ImageReader, codecs::jpeg::JpegEncoder};
-use semver::Version;
 
 use crate::error::Result;
 
@@ -44,14 +43,6 @@ pub fn img_to_jpg(data: Vec<u8>) -> Result<Vec<u8>> {
     };
     Ok(img)
 }
-
-pub fn is_newer_version(local: &str, remote: &str) -> bool {
-    let local_ver = Version::parse(local).unwrap_or_else(|_| Version::new(0, 0, 0));
-    let remote_ver =
-        Version::parse(remote.trim_start_matches('v')).unwrap_or_else(|_| Version::new(0, 0, 0));
-    remote_ver > local_ver
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

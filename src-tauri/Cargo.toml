@@ -43,20 +43,11 @@ tauri-specta = { version = "2.0.0-rc", features = [
 ], optional = true }
 specta-typescript = { version = "0.0.11", optional = true }
 
-reqwest = { version = "0.13.2", features = [
-  "gzip",
-  "deflate",
-  "brotli",
-  "zstd",
-  "json",
-] }
-scraper = "0.26.0"
+reqwest = { version = "0.13.2", features = ["json"] }
 zip = "8.0.0"
 tokio = { version = "1.42.0", features = ["full"] }
 regex = "1.11.1"
 chrono = { version = "0.4.39" }
-fast2s = "0.3.1"
-image = "0.25.5"
 clap = { version = "4.5.23", features = ["derive"] }
 parking_lot = "0.12.4"
 semver = "1.0.26"

@@ -2,6 +2,7 @@ pub use bilinovel as core;
 pub use bilinovel::{BiliClient, BiliNovel};
 
 pub mod cli;
+pub mod client;
 pub mod config;
 pub mod downloader;
 pub mod epub_builder;
@@ -9,6 +10,7 @@ pub mod error;
 pub mod manage;
 pub mod message;
 pub mod runtime;
+mod utils;
 
 pub use cli::run_cli;
 pub use config::Config;
